@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Smart Wardrobe — Your closet, made intelligent</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700;12..96,800&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#ECEAF2;
+    --paper-2:#F8F7FC;
+    --card:#FFFFFF;
+    --ink:#1A1922;
+    --ink-soft:#56535F;
+    --ink-faint:#8C8997;
+    --iris:#5648E0;
+    --iris-deep:#2C2186;
+    --iris-wash:#EDEBFB;
+    --line:rgba(26,25,34,.12);
+    --line-strong:rgba(26,25,34,.22);
+    --ok:#2F8F5B;
+    --radius:18px;
+    --maxw:1180px;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:"Hanken Grotesk",system-ui,sans-serif;
+    font-size:17px;
+    line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
+  }
+  h1,h2,h3{font-family:"Bricolage Grotesque",sans-serif;font-weight:700;line-height:1.02;margin:0;letter-spacing:-.02em;}
+  p{margin:0;}
+  a{color:inherit;text-decoration:none;}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 28px;}
+  .mono{font-family:"JetBrains Mono",monospace;}
+  .eyebrow{
+    font-family:"JetBrains Mono",monospace;
+    font-size:12px;letter-spacing:.22em;text-transform:uppercase;
+    color:var(--iris);font-weight:500;
+  }
+
+  /* ---------- spectrum rail signature ---------- */
+  .spectrum{
+    height:4px;width:100%;border:0;margin:0;
+    background:linear-gradient(90deg,
+      #1A1922 0 6%, #6E6A78 6% 12%,
+      #C9486B 12% 22%, #E0824B 22% 32%, #E3C24B 32% 42%,
+      #4FA06A 42% 54%, #3E8FB0 54% 66%, #5648E0 66% 78%,
+      #8C57C9 78% 88%, #C9C6D2 88% 100%);
+  }
+
+  /* ---------- header ---------- */
+  header{
+    position:sticky;top:0;z-index:50;
+    backdrop-filter:saturate(140%) blur(12px);
+    background:rgba(236,234,242,.82);
+    border-bottom:1px solid var(--line);
+  }
+  .nav{display:flex;align-items:center;justify-content:space-between;height:68px;}
+  .brand{display:flex;align-items:center;gap:11px;font-family:"Bricolage Grotesque";font-weight:700;font-size:18px;letter-spacing:-.02em;}
+  .brand-mark{width:26px;height:26px;border-radius:7px;position:relative;background:var(--ink);flex:none;}
+  .brand-mark::before{content:"";position:absolute;inset:5px 6px auto 6px;height:3px;border-radius:2px;background:linear-gradient(90deg,#C9486B,#E3C24B,#4FA06A,#3E8FB0,#5648E0);}
+  .brand-mark::after{content:"";position:absolute;top:11px;left:50%;transform:translateX(-50%);width:9px;height:9px;border:2px solid var(--paper);border-top:0;border-radius:0 0 50% 50%;}
+  nav .links{display:flex;gap:30px;align-items:center;}
+  nav .links a{font-size:15px;color:var(--ink-soft);font-weight:500;transition:color .15s;}
+  nav .links a:hover{color:var(--ink);}
+  .btn{
+    font-family:"Hanken Grotesk";font-weight:600;font-size:15px;
+    border-radius:999px;padding:11px 20px;cursor:pointer;border:1px solid transparent;
+    transition:transform .12s ease, background .15s, color .15s, box-shadow .15s;
+    display:inline-flex;align-items:center;gap:8px;line-height:1;
+  }
+  .btn:active{transform:translateY(1px);}
+  .btn-primary{background:var(--iris);color:#fff;box-shadow:0 1px 0 rgba(0,0,0,.04);}
+  .btn-primary:hover{background:var(--iris-deep);}
+  .btn-ghost{background:transparent;color:var(--ink);border-color:var(--line-strong);}
+  .btn-ghost:hover{border-color:var(--ink);}
+  .btn-dark{background:var(--ink);color:#fff;}
+  .btn-dark:hover{background:#000;}
+  :focus-visible{outline:3px solid var(--iris);outline-offset:2px;border-radius:6px;}
+
+  /* ---------- hero ---------- */
+  .hero{padding:74px 0 64px;}
+  .hero-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:56px;align-items:center;}
+  .hero h1{font-size:clamp(42px,6.4vw,78px);font-weight:800;}
+  .hero h1 em{font-style:normal;color:var(--iris);}
+  .hero .lead{margin-top:22px;font-size:19px;color:var(--ink-soft);max-width:30em;}
+  .hero-cta{display:flex;gap:14px;margin-top:30px;flex-wrap:wrap;}
+  .hero-note{margin-top:18px;font-size:13.5px;color:var(--ink-faint);display:flex;align-items:center;gap:8px;}
+  .hero-note .dot{width:7px;height:7px;border-radius:50%;background:var(--ok);}
+
+  /* ---------- closet rail visual ---------- */
+  .closet{
+    background:var(--card);border:1px solid var(--line);border-radius:24px;
+    padding:24px 24px 26px;box-shadow:0 24px 60px -34px rgba(26,25,34,.5);
+    position:relative;
+  }
+  .closet-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;}
+  .closet-top .t{font-family:"JetBrains Mono";font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-faint);}
+  .closet-top .c{font-family:"JetBrains Mono";font-size:11px;color:var(--iris);font-weight:500;}
+  .rail{
+    position:relative;padding-top:14px;
+    display:grid;grid-template-columns:repeat(9,1fr);gap:6px;align-items:end;height:188px;
+  }
+  .rail::before{content:"";position:absolute;top:6px;left:-6px;right:-6px;height:3px;border-radius:3px;background:var(--ink);opacity:.85;}
+  .garment{position:relative;height:var(--h,128px);align-self:end;}
+  .garment::before{ /* hanger hook */
+    content:"";position:absolute;top:-12px;left:50%;transform:translateX(-50%);
+    width:11px;height:13px;border:2px solid var(--ink);border-bottom:0;border-radius:50% 50% 0 0;opacity:.7;
+  }
+  .g-body{position:absolute;inset:auto 0 0 0;height:calc(100% - 6px);background:var(--g,#ccc);border-radius:6px;}
+  .g-top .g-body{clip-path:polygon(0 22%,26% 22%,38% 0,62% 0,74% 22%,100% 22%,100% 100%,0 100%);}
+  .g-pant .g-body{clip-path:polygon(8% 0,92% 0,82% 100%,56% 100%,50% 38%,44% 100%,18% 100%);}
+  .g-coat .g-body{clip-path:polygon(0 16%,30% 16%,40% 0,60% 0,70% 16%,100% 16%,100% 100%,68% 100%,50% 30%,32% 100%,0 100%);}
+  .rail-cap{display:flex;justify-content:space-between;margin-top:16px;}
+  .rail-cap span{font-family:"JetBrains Mono";font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint);}
+
+  /* ---------- generated outfit card (in closet) ---------- */
+  .outfit{margin-top:20px;border-top:1px dashed var(--line-strong);padding-top:18px;display:none;}
+  .outfit.show{display:block;animation:rise .4s ease both;}
+  @keyframes rise{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
+  .outfit-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+  .outfit-head h4{font-family:"Bricolage Grotesque";font-size:17px;font-weight:700;margin:0;}
+  .occ-chip{font-family:"JetBrains Mono";font-size:11px;background:var(--iris-wash);color:var(--iris-deep);padding:4px 9px;border-radius:6px;letter-spacing:.04em;}
+  .pieces{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
+  .piece{background:var(--paper-2);border:1px solid var(--line);border-radius:12px;padding:10px;text-align:center;}
+  .swatch{width:30px;height:30px;border-radius:8px;margin:0 auto 8px;border:1px solid rgba(0,0,0,.08);}
+  .piece .nm{font-size:12.5px;font-weight:600;line-height:1.25;}
+  .piece .ty{font-family:"JetBrains Mono";font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);margin-top:3px;}
+
+  /* ---------- generic section ---------- */
+  .section{padding:84px 0;}
+  .section-head{max-width:42rem;margin-bottom:46px;}
+  .section-head.center{margin-left:auto;margin-right:auto;text-align:center;}
+  .section h2{font-size:clamp(30px,4.2vw,48px);margin-top:14px;}
+  .section-head p{margin-top:16px;color:var(--ink-soft);font-size:18px;}
+
+  /* ---------- steps ---------- */
+  .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;}
+  .step{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:26px;position:relative;overflow:hidden;}
+  .step .num{font-family:"JetBrains Mono";font-size:13px;color:var(--iris);font-weight:700;letter-spacing:.1em;}
+  .step h3{font-size:21px;margin:14px 0 9px;}
+  .step p{color:var(--ink-soft);font-size:15.5px;}
+  /* care-label tag */
+  .tag{margin-top:18px;background:var(--paper-2);border:1px solid var(--line);border-radius:10px;padding:12px 13px;font-family:"JetBrains Mono";font-size:11.5px;line-height:1.9;}
+  .tag .row{display:flex;justify-content:space-between;gap:12px;}
+  .tag .k{color:var(--ink-faint);letter-spacing:.08em;text-transform:uppercase;}
+  .tag .v{color:var(--ink);font-weight:500;}
+  .tag .stamp{display:inline-flex;align-items:center;gap:6px;color:var(--iris);margin-bottom:8px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;}
+  .tag .stamp::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--iris);}
+
+  /* ---------- outfit generator (interactive section) ---------- */
+  .gen{background:var(--ink);color:#fff;border-radius:28px;padding:48px;}
+  .gen h2{color:#fff;}
+  .gen .section-head p{color:rgba(255,255,255,.7);}
+  .occasions{display:flex;flex-wrap:wrap;gap:9px;margin:0 0 26px;}
+  .occ{
+    font-family:"Hanken Grotesk";font-weight:500;font-size:14px;color:#fff;
+    background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);
+    padding:8px 15px;border-radius:999px;cursor:pointer;transition:.15s;
+  }
+  .occ:hover{background:rgba(255,255,255,.16);}
+  .occ.active{background:var(--iris);border-color:var(--iris);}
+  .gen-stage{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);border-radius:18px;padding:26px;min-height:220px;}
+  .gen-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;height:168px;color:rgba(255,255,255,.6);gap:14px;}
+  .gen-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;}
+  .gp{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:16px;text-align:center;animation:rise .35s ease both;}
+  .gp .gsw{width:46px;height:46px;border-radius:12px;margin:0 auto 12px;border:1px solid rgba(255,255,255,.18);}
+  .gp .nm{font-weight:600;font-size:14.5px;}
+  .gp .role{font-family:"JetBrains Mono";font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.55);margin-top:5px;}
+  .gen-actions{display:flex;align-items:center;gap:14px;margin-top:22px;flex-wrap:wrap;}
+  .gen-actions .why{font-size:13.5px;color:rgba(255,255,255,.6);}
+  .btn-light{background:#fff;color:var(--ink);}
+  .btn-light:hover{background:#EDEBFB;}
+  .btn-line{background:transparent;color:#fff;border-color:rgba(255,255,255,.3);}
+  .btn-line:hover{border-color:#fff;}
+
+  /* ---------- match around one item ---------- */
+  .match{display:grid;grid-template-columns:.85fr 1.15fr;gap:40px;align-items:center;}
+  .pick{display:flex;flex-wrap:wrap;gap:10px;}
+  .pick button{
+    background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;
+    display:flex;align-items:center;gap:10px;cursor:pointer;font-family:inherit;font-size:14.5px;font-weight:600;color:var(--ink);transition:.15s;
+  }
+  .pick button:hover{border-color:var(--line-strong);}
+  .pick button.active{border-color:var(--iris);box-shadow:0 0 0 1px var(--iris);}
+  .pick .sw{width:20px;height:20px;border-radius:6px;border:1px solid rgba(0,0,0,.1);}
+  .match-out{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:24px;}
+  .match-out .lbl{font-family:"JetBrains Mono";font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint);}
+  .match-out h3{font-size:22px;margin:6px 0 18px;}
+  .pair-list{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+  .pair{text-align:center;padding:14px 8px;border-radius:12px;background:var(--paper-2);border:1px solid var(--line);animation:rise .3s ease both;}
+  .pair .sw{width:34px;height:34px;border-radius:9px;margin:0 auto 9px;border:1px solid rgba(0,0,0,.08);}
+  .pair .nm{font-size:13px;font-weight:600;}
+  .pair .ro{font-family:"JetBrains Mono";font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);margin-top:3px;}
+
+  /* ---------- features grid (save / plan / history) ---------- */
+  .feat{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;}
+  .fcard{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:26px;}
+  .fcard h3{font-size:20px;margin:0 0 10px;display:flex;align-items:center;gap:10px;}
+  .ficon{width:34px;height:34px;border-radius:9px;background:var(--iris-wash);display:grid;place-items:center;flex:none;}
+  .ficon svg{width:18px;height:18px;stroke:var(--iris-deep);fill:none;stroke-width:1.8;}
+  .fcard p{color:var(--ink-soft);font-size:15px;}
+  .pill-list{display:flex;flex-wrap:wrap;gap:7px;margin-top:14px;}
+  .pill-list span{font-size:12.5px;background:var(--paper-2);border:1px solid var(--line);border-radius:999px;padding:5px 11px;color:var(--ink-soft);}
+
+  /* ---------- assistant chat ---------- */
+  .assist{display:grid;grid-template-columns:1fr 1fr;gap:44px;align-items:center;}
+  .chat{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:22px;box-shadow:0 24px 60px -40px rgba(26,25,34,.5);}
+  .chat-row{display:flex;margin-bottom:12px;}
+  .bubble{max-width:80%;padding:11px 15px;border-radius:16px;font-size:14.5px;line-height:1.5;}
+  .from-user{margin-left:auto;background:var(--iris);color:#fff;border-bottom-right-radius:5px;}
+  .from-ai{background:var(--paper);color:var(--ink);border-bottom-left-radius:5px;border:1px solid var(--line);}
+  .prompts{display:flex;flex-direction:column;gap:10px;margin-top:8px;}
+  .prompt{
+    text-align:left;background:var(--card);border:1px solid var(--line);border-radius:13px;
+    padding:14px 16px;cursor:pointer;font-family:inherit;font-size:15px;color:var(--ink);transition:.15s;display:flex;justify-content:space-between;align-items:center;gap:12px;
+  }
+  .prompt:hover{border-color:var(--iris);color:var(--iris-deep);}
+  .prompt::after{content:"→";color:var(--iris);font-weight:700;}
+
+  /* ---------- stat strip ---------- */
+  .stat{display:grid;grid-template-columns:1fr 1.4fr;gap:40px;align-items:center;background:var(--iris-wash);border:1px solid #DAD6F7;border-radius:24px;padding:44px 48px;}
+  .stat .big{font-family:"Bricolage Grotesque";font-weight:800;font-size:clamp(48px,7vw,84px);letter-spacing:-.03em;line-height:.95;color:var(--iris-deep);}
+  .stat .big small{display:block;font-family:"JetBrains Mono";font-size:14px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--iris);margin-top:10px;}
+  .stat p{font-size:18px;color:#3A356B;}
+
+  /* ---------- account / verification ---------- */
+  .acct{display:grid;grid-template-columns:1.05fr .95fr;gap:48px;align-items:start;}
+  .acct-points{display:flex;flex-direction:column;gap:22px;margin-top:8px;}
+  .ap{display:flex;gap:16px;}
+  .ap .ic{width:40px;height:40px;border-radius:11px;background:var(--ink);display:grid;place-items:center;flex:none;}
+  .ap .ic svg{width:20px;height:20px;stroke:#fff;fill:none;stroke-width:1.7;}
+  .ap h3{font-size:18px;margin:0 0 4px;}
+  .ap p{color:var(--ink-soft);font-size:15px;}
+
+  .signup{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:30px;box-shadow:0 24px 60px -42px rgba(26,25,34,.55);}
+  .signup h3{font-size:22px;margin:0 0 4px;}
+  .signup .sub{color:var(--ink-soft);font-size:14.5px;margin-bottom:22px;}
+  .tabs{display:flex;background:var(--paper);border-radius:11px;padding:4px;margin-bottom:18px;}
+  .tabs button{flex:1;border:0;background:transparent;font-family:inherit;font-weight:600;font-size:14.5px;color:var(--ink-soft);padding:9px;border-radius:8px;cursor:pointer;transition:.15s;}
+  .tabs button.active{background:var(--card);color:var(--ink);box-shadow:0 1px 4px rgba(0,0,0,.08);}
+  .field label{display:block;font-size:13px;font-weight:600;color:var(--ink-soft);margin-bottom:7px;}
+  .field input{
+    width:100%;font-family:inherit;font-size:16px;padding:13px 14px;border-radius:11px;
+    border:1px solid var(--line-strong);background:var(--paper-2);color:var(--ink);transition:.15s;
+  }
+  .field input:focus{outline:0;border-color:var(--iris);background:#fff;box-shadow:0 0 0 3px var(--iris-wash);}
+  .field .err{color:#C0392B;font-size:12.5px;margin-top:7px;display:none;}
+  .field .err.show{display:block;}
+  .signup .btn-primary{width:100%;justify-content:center;margin-top:18px;padding:14px;}
+  .fineprint{font-size:12px;color:var(--ink-faint);margin-top:14px;text-align:center;line-height:1.5;}
+
+  /* verify step */
+  .verify{display:none;}
+  .verify.show{display:block;animation:rise .35s ease both;}
+  .verify .back{background:none;border:0;color:var(--iris);font-family:inherit;font-weight:600;cursor:pointer;font-size:14px;padding:0;margin-bottom:14px;display:inline-flex;gap:6px;align-items:center;}
+  .verify .dest{font-weight:700;}
+  .code{display:flex;gap:10px;margin:22px 0 6px;}
+  .code input{
+    width:100%;aspect-ratio:1;text-align:center;font-family:"JetBrains Mono";font-size:24px;font-weight:700;
+    border:1px solid var(--line-strong);border-radius:12px;background:var(--paper-2);color:var(--ink);
+  }
+  .code input:focus{outline:0;border-color:var(--iris);background:#fff;box-shadow:0 0 0 3px var(--iris-wash);}
+  .resend{font-size:13px;color:var(--ink-faint);margin-top:14px;}
+  .resend button{background:none;border:0;color:var(--iris);font-weight:600;cursor:pointer;font-family:inherit;font-size:13px;padding:0;}
+  .hint{font-size:12px;color:var(--ink-faint);background:var(--paper-2);border:1px dashed var(--line-strong);border-radius:10px;padding:9px 12px;margin-top:16px;text-align:center;}
+
+  /* success */
+  .done{display:none;text-align:center;padding:14px 0;}
+  .done.show{display:block;animation:rise .4s ease both;}
+  .done .check{width:62px;height:62px;border-radius:50%;background:var(--ok);display:grid;place-items:center;margin:0 auto 18px;}
+  .done .check svg{width:30px;height:30px;stroke:#fff;fill:none;stroke-width:3;}
+  .done h3{font-size:23px;margin-bottom:6px;}
+  .done p{color:var(--ink-soft);font-size:15px;}
+
+  /* ---------- final CTA ---------- */
+  .final{background:var(--ink);color:#fff;border-radius:30px;padding:62px 48px;text-align:center;position:relative;overflow:hidden;}
+  .final h2{color:#fff;font-size:clamp(32px,5vw,58px);font-weight:800;}
+  .final p{color:rgba(255,255,255,.72);font-size:19px;margin:18px auto 0;max-width:34rem;}
+  .final-form{display:flex;gap:10px;max-width:460px;margin:30px auto 0;}
+  .final-form input{flex:1;font-family:inherit;font-size:16px;padding:14px 16px;border-radius:999px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.07);color:#fff;}
+  .final-form input::placeholder{color:rgba(255,255,255,.5);}
+  .final-form input:focus{outline:0;border-color:#fff;}
+  .final .spectrum{position:absolute;left:0;right:0;bottom:0;}
+
+  /* ---------- footer ---------- */
+  footer{padding:54px 0 60px;}
+  .foot{display:flex;justify-content:space-between;align-items:flex-start;gap:30px;flex-wrap:wrap;}
+  .foot .col h5{font-size:13px;font-family:"JetBrains Mono";letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint);margin:0 0 14px;font-weight:500;}
+  .foot .col a{display:block;color:var(--ink-soft);font-size:14.5px;margin-bottom:9px;transition:.15s;}
+  .foot .col a:hover{color:var(--ink);}
+  .foot-bottom{margin-top:46px;padding-top:24px;border-top:1px solid var(--line);display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;font-size:13px;color:var(--ink-faint);}
+
+  /* ---------- responsive ---------- */
+  @media(max-width:920px){
+    .hero-grid,.match,.assist,.acct,.stat{grid-template-columns:1fr;gap:36px;}
+    .steps,.feat{grid-template-columns:1fr;}
+    .pieces,.gen-grid{grid-template-columns:repeat(2,1fr);}
+    nav .links{display:none;}
+    .gen{padding:32px 22px;}
+    .stat{padding:34px 28px;}
+    .final{padding:46px 26px;}
+  }
+  @media(max-width:560px){
+    .wrap{padding:0 18px;}
+    .pieces,.gen-grid,.pair-list{grid-template-columns:1fr 1fr;}
+    .rail{grid-template-columns:repeat(7,1fr);}
+    .rail .garment:nth-child(8),.rail .garment:nth-child(9){display:none;}
+    .final-form{flex-direction:column;}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *{animation:none!important;scroll-behavior:auto!important;transition:none!important;}
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ HEADER ============ -->
+<header>
+  <div class="wrap nav">
+    <div class="brand"><span class="brand-mark"></span> Smart Wardrobe</div>
+    <nav class="links">
+      <a href="#how">How it works</a>
+      <a href="#outfits">Outfits</a>
+      <a href="#planning">Planning</a>
+      <a href="#account">Account</a>
+    </nav>
+    <a class="btn btn-primary" href="#account">Create account</a>
+  </div>
+</header>
+<hr class="spectrum" />
+
+<!-- ============ HERO ============ -->
+<section class="hero">
+  <div class="wrap hero-grid">
+    <div>
+      <span class="eyebrow">Your closet, made intelligent</span>
+      <h1>Wear <em>everything</em> you already own.</h1>
+      <p class="lead">Smart Wardrobe photographs your clothes, sorts them automatically, and builds complete outfits from the pieces already hanging in your closet — in seconds, not mornings.</p>
+      <div class="hero-cta">
+        <button class="btn btn-primary" id="heroGenerate">Create an outfit</button>
+        <a class="btn btn-ghost" href="#account">Create account</a>
+      </div>
+      <p class="hero-note"><span class="dot"></span> 40–50 pieces. Hundreds of outfits. Nothing new to buy.</p>
+    </div>
+
+    <div class="closet">
+      <div class="closet-top">
+        <span class="t">My wardrobe — sorted by color</span>
+        <span class="c">47 items</span>
+      </div>
+      <div class="rail" id="rail"></div>
+      <div class="rail-cap"><span>Neutrals</span><span>Warm</span><span>Cool</span></div>
+
+      <div class="outfit" id="heroOutfit">
+        <div class="outfit-head">
+          <h4>Today's outfit</h4>
+          <span class="occ-chip" id="heroOcc">For work</span>
+        </div>
+        <div class="pieces" id="heroPieces"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ HOW IT WORKS ============ -->
+<section class="section" id="how">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">How it works</span>
+      <h2>Three steps to a digital closet.</h2>
+      <p>Point your camera at what you own. Smart Wardrobe handles the rest — reading, tagging, and organizing every piece.</p>
+    </div>
+    <div class="steps">
+      <div class="step">
+        <span class="num">01 / Photograph</span>
+        <h3>Snap what you own</h3>
+        <p>Clothes, shoes, bags, belts, watches, jewelry, hats, and glasses. One photo each is enough to get a piece into your wardrobe.</p>
+      </div>
+      <div class="step">
+        <span class="num">02 / Recognize</span>
+        <h3>The AI reads each item</h3>
+        <p>It identifies the details automatically, so you never type out a single field.</p>
+        <div class="tag">
+          <span class="stamp">Detected</span>
+          <div class="row"><span class="k">Type</span><span class="v">Oxford shirt</span></div>
+          <div class="row"><span class="k">Color</span><span class="v">White</span></div>
+          <div class="row"><span class="k">Material</span><span class="v">Cotton</span></div>
+          <div class="row"><span class="k">Cut</span><span class="v">Slim</span></div>
+          <div class="row"><span class="k">Season</span><span class="v">All-season</span></div>
+          <div class="row"><span class="k">Condition</span><span class="v">Excellent</span></div>
+        </div>
+      </div>
+      <div class="step">
+        <span class="num">03 / Organize</span>
+        <h3>Your wardrobe builds itself</h3>
+        <p>Every piece lands in a digital closet, grouped into tops, bottoms, outerwear, shoes, and accessories — and filterable by color, season, style, brand, or occasion.</p>
+        <div class="pill-list">
+          <span>Color</span><span>Season</span><span>Style</span><span>Brand</span><span>Occasion</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ OUTFIT GENERATOR ============ -->
+<section class="section" id="outfits">
+  <div class="wrap">
+    <div class="gen">
+      <div class="section-head">
+        <span class="eyebrow" style="color:#B6ACF7">Generate outfits</span>
+        <h2>One button. A full look.</h2>
+        <p>Pick an occasion and Smart Wardrobe assembles a complete outfit from your own pieces. Don't love it? Generate another. Every day brings new combinations.</p>
+      </div>
+
+      <div class="occasions" id="occasions"></div>
+
+      <div class="gen-stage">
+        <div class="gen-empty" id="genEmpty">
+          <span class="eyebrow" style="color:rgba(255,255,255,.5)">Ready when you are</span>
+          <div>Choose an occasion above, then create your look.</div>
+        </div>
+        <div class="gen-grid" id="genGrid" style="display:none"></div>
+      </div>
+
+      <div class="gen-actions">
+        <button class="btn btn-light" id="genBtn">Create an outfit</button>
+        <button class="btn btn-line" id="genAgain" style="display:none">Try another</button>
+        <span class="why" id="genWhy"></span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ MATCH ONE ITEM ============ -->
+<section class="section" id="match">
+  <div class="wrap match">
+    <div>
+      <span class="eyebrow">Build around one piece</span>
+      <h2 style="font-size:clamp(28px,4vw,42px);margin-top:14px;">Start with what you love.</h2>
+      <p style="color:var(--ink-soft);margin-top:16px;font-size:17px;">Tap any piece and Smart Wardrobe shows what pairs with it best — pulled only from clothes you already have.</p>
+      <div class="pick" id="pick" style="margin-top:24px"></div>
+    </div>
+    <div class="match-out">
+      <span class="lbl">Pairs well with</span>
+      <h3 id="matchTitle">White Oxford shirt</h3>
+      <div class="pair-list" id="pairList"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ PLANNING / SAVE / HISTORY ============ -->
+<section class="section" id="planning">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Save, plan, repeat less</span>
+      <h2>Outfits that stay organized.</h2>
+    </div>
+    <div class="feat">
+      <div class="fcard">
+        <h3><span class="ficon"><svg viewBox="0 0 24 24"><path d="M5 3v18l7-5 7 5V3z"/></svg></span>Save favorites</h3>
+        <p>Keep the looks you love in collections you name yourself, and grow a personal library of ready-to-wear outfits.</p>
+        <div class="pill-list"><span>Favorites</span><span>Work</span><span>Summer</span><span>Travel</span><span>Evening</span></div>
+      </div>
+      <div class="fcard">
+        <h3><span class="ficon"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 9h18M8 3v4M16 3v4"/></svg></span>Plan ahead</h3>
+        <p>Choose outfits for tomorrow, the week, a holiday, or a work trip. Everything you set appears on a calendar.</p>
+        <div class="pill-list"><span>Tomorrow</span><span>This week</span><span>Vacation</span><span>Business trip</span></div>
+      </div>
+      <div class="fcard">
+        <h3><span class="ficon"><svg viewBox="0 0 24 24"><path d="M12 8v4l3 2"/><circle cx="12" cy="12" r="9"/></svg></span>Wear history</h3>
+        <p>Smart Wardrobe remembers what you've worn, so it won't repeat a look too soon — and it surfaces your most successful combinations.</p>
+        <div class="pill-list"><span>Avoid repeats</span><span>Best looks</span><span>Most worn</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ ASSISTANT ============ -->
+<section class="section">
+  <div class="wrap assist">
+    <div>
+      <span class="eyebrow">Personal assistant</span>
+      <h2 style="font-size:clamp(28px,4vw,44px);margin-top:14px;">Just ask. Get dressed.</h2>
+      <p style="color:var(--ink-soft);margin:16px 0 8px;font-size:17px;">Tell Smart Wardrobe what your day looks like and it answers with a complete outfit from your closet. Try one:</p>
+      <div class="prompts" id="prompts"></div>
+    </div>
+    <div class="chat" id="chat">
+      <div class="chat-row"><div class="bubble from-user">It's 54°F and raining today.</div></div>
+      <div class="chat-row"><div class="bubble from-ai">Here's a dry, put-together look from your wardrobe: charcoal trench, navy knit, dark jeans, and your waterproof Chelsea boots. Want a lighter alternative?</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ STAT ============ -->
+<section class="section">
+  <div class="wrap">
+    <div class="stat">
+      <div class="big">100s<small>outfits unlocked</small></div>
+      <p>From just 40–50 pieces, Smart Wardrobe keeps finding fresh combinations of clothes you already own — so you look new without buying new.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ ACCOUNT & VERIFICATION ============ -->
+<section class="section" id="account">
+  <div class="wrap acct">
+    <div>
+      <span class="eyebrow">Your account, secured</span>
+      <h2 style="font-size:clamp(30px,4.4vw,48px);margin-top:14px;">One wardrobe. Yours alone.</h2>
+      <p style="color:var(--ink-soft);margin-top:16px;font-size:18px;max-width:30em;">Every person gets a private account, verified by email or phone, so your closet, outfits, and history stay yours across every device.</p>
+      <div class="acct-points">
+        <div class="ap">
+          <span class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg></span>
+          <div><h3>Sign up by email or phone</h3><p>Create an account in seconds, or continue with Google or Apple.</p></div>
+        </div>
+        <div class="ap">
+          <span class="ic"><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span>
+          <div><h3>Verify it's you</h3><p>Confirm with a link sent to your email or a 6-digit code by SMS.</p></div>
+        </div>
+        <div class="ap">
+          <span class="ic"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></svg></span>
+          <div><h3>Private by default</h3><p>Your wardrobe photos are encrypted, visible only to you, and you can delete everything anytime.</p></div>
+        </div>
+        <div class="ap">
+          <span class="ic"><svg viewBox="0 0 24 24"><path d="M4 7h11M4 12h16M4 17h9"/><circle cx="19" cy="7" r="2"/><circle cx="14" cy="17" r="2"/></svg></span>
+          <div><h3>Synced everywhere</h3><p>Your closet lives in your account, not on one device — open it on phone, tablet, or web.</p></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- live signup demo -->
+    <div class="signup">
+      <!-- step 1: details -->
+      <div id="stepDetails">
+        <h3>Create your account</h3>
+        <p class="sub">Start your digital wardrobe in under a minute.</p>
+        <div class="tabs">
+          <button class="active" id="tabEmail">Email</button>
+          <button id="tabPhone">Phone</button>
+        </div>
+        <div class="field">
+          <label id="inLabel" for="signupInput">Email address</label>
+          <input id="signupInput" type="email" placeholder="you@example.com" autocomplete="email" />
+          <div class="err" id="signupErr">Enter a valid email address.</div>
+        </div>
+        <button class="btn btn-primary" id="createBtn">Create account</button>
+        <p class="fineprint">By continuing you agree to the Terms and Privacy Policy.</p>
+      </div>
+
+      <!-- step 2: verify -->
+      <div class="verify" id="stepVerify">
+        <button class="back" id="backBtn">← Back</button>
+        <h3>Enter your code</h3>
+        <p class="sub">We sent a 6-digit code to <span class="dest" id="dest">you@example.com</span>.</p>
+        <div class="code" id="codeBoxes">
+          <input maxlength="1" inputmode="numeric" aria-label="Digit 1" />
+          <input maxlength="1" inputmode="numeric" aria-label="Digit 2" />
+          <input maxlength="1" inputmode="numeric" aria-label="Digit 3" />
+          <input maxlength="1" inputmode="numeric" aria-label="Digit 4" />
+          <input maxlength="1" inputmode="numeric" aria-label="Digit 5" />
+          <input maxlength="1" inputmode="numeric" aria-label="Digit 6" />
+        </div>
+        <p class="resend">Didn't get it? <button id="resendBtn">Resend code</button></p>
+        <p class="hint">Demo: type any 6 digits to verify.</p>
+      </div>
+
+      <!-- step 3: done -->
+      <div class="done" id="stepDone">
+        <div class="check"><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></div>
+        <h3>You're verified</h3>
+        <p>Your wardrobe is ready. Snap your first piece to begin.</p>
+        <button class="btn btn-dark" style="margin-top:20px" id="restartBtn">Start over</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FINAL CTA ============ -->
+<section class="section" style="padding-top:0">
+  <div class="wrap">
+    <div class="final">
+      <span class="eyebrow" style="color:#B6ACF7">Open your wardrobe</span>
+      <h2>Get dressed in seconds.</h2>
+      <p>Photograph your closet once. Then let Smart Wardrobe do the choosing — every single morning.</p>
+      <div class="final-form">
+        <input type="text" placeholder="Email or phone number" aria-label="Email or phone number" />
+        <a class="btn btn-light" href="#account">Create account</a>
+      </div>
+      <hr class="spectrum" />
+    </div>
+  </div>
+</section>
+
+<!-- ============ FOOTER ============ -->
+<footer>
+  <div class="wrap">
+    <div class="foot">
+      <div style="max-width:18rem">
+        <div class="brand" style="margin-bottom:12px"><span class="brand-mark"></span> Smart Wardrobe</div>
+        <p style="color:var(--ink-soft);font-size:14.5px">The intelligent closet that helps you wear everything you already own.</p>
+      </div>
+      <div class="col"><h5>Product</h5><a href="#how">How it works</a><a href="#outfits">Outfit generator</a><a href="#planning">Planning</a><a href="#account">Account</a></div>
+      <div class="col"><h5>Wardrobe</h5><a href="#match">Build around a piece</a><a href="#outfits">Occasions</a><a href="#planning">Wear history</a></div>
+      <div class="col"><h5>Company</h5><a href="#">About</a><a href="#">Privacy</a><a href="#">Terms</a><a href="#">Support</a></div>
+    </div>
+    <div class="foot-bottom">
+      <span>© 2026 Smart Wardrobe. All rights reserved.</span>
+      <span class="mono">Made for the clothes you already love.</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------- shared wardrobe data ---------- */
+  var WARDROBE = {
+    top:   [
+      {nm:"White Oxford shirt", c:"#F5F4F1"},
+      {nm:"Navy merino knit", c:"#26334F"},
+      {nm:"Striped tee", c:"#C9C6D2"},
+      {nm:"Olive overshirt", c:"#6B6B43"},
+      {nm:"Burgundy polo", c:"#7C2B3B"}
+    ],
+    bottom:[
+      {nm:"Dark indigo jeans", c:"#2B3550"},
+      {nm:"Stone chinos", c:"#C2B49A"},
+      {nm:"Charcoal trousers", c:"#3A3A40"},
+      {nm:"Tailored grey pants", c:"#7E7E88"}
+    ],
+    shoe:  [
+      {nm:"White sneakers", c:"#ECECEC"},
+      {nm:"Brown leather boots", c:"#6E4326"},
+      {nm:"Black derbies", c:"#1E1E22"},
+      {nm:"Suede loafers", c:"#8A6B4A"}
+    ],
+    outer: [
+      {nm:"Charcoal trench", c:"#44444C"},
+      {nm:"Camel overcoat", c:"#B58A57"},
+      {nm:"Denim jacket", c:"#3E5A78"},
+      {nm:"Navy blazer", c:"#222E47"}
+    ],
+    acc:   [
+      {nm:"Tan leather belt", c:"#9A6B43"},
+      {nm:"Silver watch", c:"#BFC2C7"},
+      {nm:"Wool scarf", c:"#8C3A4A"},
+      {nm:"Leather tote", c:"#5A3C2A"}
+    ]
+  };
+
+  var OCCASIONS = ["Work","Walk","Date","Restaurant","Meeting","Travel","Party","Hot weather","Rain","Cold weather"];
+
+  function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+
+  /* ---------- render color rail ---------- */
+  var railHues = [
+    {c:"#23222B",t:"g-top",h:120},{c:"#6E6A78",t:"g-pant",h:150},
+    {c:"#7C2B3B",t:"g-top",h:128},{c:"#B58A57",t:"g-coat",h:165},
+    {c:"#C9A24B",t:"g-top",h:118},{c:"#4F7C58",t:"g-pant",h:150},
+    {c:"#3E7A98",t:"g-coat",h:165},{c:"#4034A8",t:"g-top",h:126},
+    {c:"#C9C6D2",t:"g-pant",h:148}
+  ];
+  var rail = document.getElementById("rail");
+  railHues.forEach(function(g){
+    var d = document.createElement("div");
+    d.className = "garment "+g.t;
+    d.style.setProperty("--h", g.h+"px");
+    var b = document.createElement("div");
+    b.className = "g-body";
+    b.style.setProperty("--g", g.c);
+    d.appendChild(b);
+    rail.appendChild(d);
+  });
+
+  /* ---------- hero generate ---------- */
+  var heroPieces = document.getElementById("heroPieces");
+  var heroOutfit = document.getElementById("heroOutfit");
+  var heroOcc = document.getElementById("heroOcc");
+  function heroOutfitBuild(){
+    var combo = [
+      {p:pick(WARDROBE.top), r:"Top"},
+      {p:pick(WARDROBE.bottom), r:"Bottom"},
+      {p:pick(WARDROBE.shoe), r:"Shoes"},
+      {p:pick(WARDROBE.acc), r:"Accessory"}
+    ];
+    heroPieces.innerHTML = combo.map(function(x){
+      return '<div class="piece"><div class="swatch" style="background:'+x.p.c+'"></div>'+
+             '<div class="nm">'+x.p.nm+'</div><div class="ty">'+x.r+'</div></div>';
+    }).join("");
+    heroOcc.textContent = "For " + pick(["work","a walk","dinner","the weekend","a meeting"]);
+    heroOutfit.classList.add("show");
+  }
+  document.getElementById("heroGenerate").addEventListener("click", heroOutfitBuild);
+
+  /* ---------- outfit generator section ---------- */
+  var occWrap = document.getElementById("occasions");
+  var activeOcc = "Work";
+  OCCASIONS.forEach(function(o,i){
+    var b = document.createElement("button");
+    b.className = "occ" + (i===0?" active":"");
+    b.textContent = o;
+    b.addEventListener("click", function(){
+      occWrap.querySelectorAll(".occ").forEach(function(x){x.classList.remove("active");});
+      b.classList.add("active");
+      activeOcc = o;
+    });
+    occWrap.appendChild(b);
+  });
+
+  var genGrid = document.getElementById("genGrid");
+  var genEmpty = document.getElementById("genEmpty");
+  var genAgain = document.getElementById("genAgain");
+  var genWhy = document.getElementById("genWhy");
+
+  var WHY = {
+    "Work":"Polished and comfortable for a full day.",
+    "Walk":"Easy layers you can move in.",
+    "Date":"A confident, considered look.",
+    "Restaurant":"Smart-casual, dressed up a notch.",
+    "Meeting":"Sharp and professional.",
+    "Travel":"Comfortable for hours in transit.",
+    "Party":"A standout combination from your closet.",
+    "Hot weather":"Light pieces that breathe.",
+    "Rain":"Water-ready, still put together.",
+    "Cold weather":"Warm layers that work together."
+  };
+
+  function genBuild(){
+    var needOuter = ["Cold weather","Rain","Meeting","Restaurant"].indexOf(activeOcc) > -1;
+    var combo = [
+      {p:pick(WARDROBE.top), r:"Top"},
+      {p:pick(WARDROBE.bottom), r:"Bottom"},
+      {p:pick(WARDROBE.shoe), r:"Shoes"}
+    ];
+    combo.push(needOuter ? {p:pick(WARDROBE.outer), r:"Outerwear"} : {p:pick(WARDROBE.acc), r:"Accessory"});
+    genGrid.innerHTML = combo.map(function(x){
+      return '<div class="gp"><div class="gsw" style="background:'+x.p.c+'"></div>'+
+             '<div class="nm">'+x.p.nm+'</div><div class="role">'+x.r+'</div></div>';
+    }).join("");
+    genEmpty.style.display = "none";
+    genGrid.style.display = "grid";
+    genAgain.style.display = "inline-flex";
+    genWhy.textContent = WHY[activeOcc] || "";
+  }
+  document.getElementById("genBtn").addEventListener("click", genBuild);
+  genAgain.addEventListener("click", genBuild);
+
+  /* ---------- match around one item ---------- */
+  var ANCHORS = [
+    {nm:"White Oxford shirt", c:"#F5F4F1", pairs:[
+      {nm:"Dark indigo jeans",c:"#2B3550",r:"Bottom"},
+      {nm:"Camel overcoat",c:"#B58A57",r:"Outerwear"},
+      {nm:"Brown leather boots",c:"#6E4326",r:"Shoes"},
+      {nm:"Tan leather belt",c:"#9A6B43",r:"Belt"},
+      {nm:"Silver watch",c:"#BFC2C7",r:"Watch"},
+      {nm:"Navy blazer",c:"#222E47",r:"Layer"}
+    ]},
+    {nm:"Dark indigo jeans", c:"#2B3550", pairs:[
+      {nm:"White Oxford shirt",c:"#F5F4F1",r:"Top"},
+      {nm:"Navy merino knit",c:"#26334F",r:"Layer"},
+      {nm:"White sneakers",c:"#ECECEC",r:"Shoes"},
+      {nm:"Denim jacket",c:"#3E5A78",r:"Outerwear"},
+      {nm:"Tan leather belt",c:"#9A6B43",r:"Belt"},
+      {nm:"Suede loafers",c:"#8A6B4A",r:"Shoes"}
+    ]},
+    {nm:"Camel overcoat", c:"#B58A57", pairs:[
+      {nm:"Navy merino knit",c:"#26334F",r:"Top"},
+      {nm:"Charcoal trousers",c:"#3A3A40",r:"Bottom"},
+      {nm:"Black derbies",c:"#1E1E22",r:"Shoes"},
+      {nm:"Wool scarf",c:"#8C3A4A",r:"Accessory"},
+      {nm:"Leather tote",c:"#5A3C2A",r:"Bag"},
+      {nm:"Silver watch",c:"#BFC2C7",r:"Watch"}
+    ]},
+    {nm:"White sneakers", c:"#ECECEC", pairs:[
+      {nm:"Stone chinos",c:"#C2B49A",r:"Bottom"},
+      {nm:"Striped tee",c:"#C9C6D2",r:"Top"},
+      {nm:"Denim jacket",c:"#3E5A78",r:"Outerwear"},
+      {nm:"Dark indigo jeans",c:"#2B3550",r:"Bottom"},
+      {nm:"Olive overshirt",c:"#6B6B43",r:"Layer"},
+      {nm:"Silver watch",c:"#BFC2C7",r:"Watch"}
+    ]}
+  ];
+  var pickWrap = document.getElementById("pick");
+  var matchTitle = document.getElementById("matchTitle");
+  var pairList = document.getElementById("pairList");
+  function renderMatch(idx){
+    var a = ANCHORS[idx];
+    matchTitle.textContent = a.nm;
+    pairList.innerHTML = a.pairs.map(function(p){
+      return '<div class="pair"><div class="sw" style="background:'+p.c+'"></div>'+
+             '<div class="nm">'+p.nm+'</div><div class="ro">'+p.r+'</div></div>';
+    }).join("");
+    pickWrap.querySelectorAll("button").forEach(function(b,i){
+      b.classList.toggle("active", i===idx);
+    });
+  }
+  ANCHORS.forEach(function(a,i){
+    var b = document.createElement("button");
+    b.innerHTML = '<span class="sw" style="background:'+a.c+'"></span>'+a.nm;
+    if(i===0) b.classList.add("active");
+    b.addEventListener("click", function(){ renderMatch(i); });
+    pickWrap.appendChild(b);
+  });
+  renderMatch(0);
+
+  /* ---------- assistant prompts ---------- */
+  var PROMPTS = [
+    {q:"Dress me for today.", a:"Done. For a mild day: navy merino knit, stone chinos, white sneakers, and your silver watch. Easy and clean."},
+    {q:"I need an outfit to meet a client.", a:"Sharp choice: navy blazer over a white Oxford shirt, charcoal trousers, and black derbies. Professional and confident."},
+    {q:"It's 54°F and raining today.", a:"Stay dry: charcoal trench, navy knit, dark indigo jeans, and your waterproof boots."},
+    {q:"Pack me for three days.", a:"Packed: 3 tops, 2 bottoms, 1 overcoat, 2 pairs of shoes — mixing into 6 full outfits from your closet."}
+  ];
+  var chat = document.getElementById("chat");
+  var promptsWrap = document.getElementById("prompts");
+  PROMPTS.forEach(function(p){
+    var b = document.createElement("button");
+    b.className = "prompt";
+    b.innerHTML = "<span>"+p.q+"</span>";
+    b.addEventListener("click", function(){
+      chat.innerHTML =
+        '<div class="chat-row"><div class="bubble from-user">'+p.q+'</div></div>'+
+        '<div class="chat-row"><div class="bubble from-ai">'+p.a+'</div></div>';
+    });
+    promptsWrap.appendChild(b);
+  });
+
+  /* ---------- signup + verification demo ---------- */
+  var tabEmail = document.getElementById("tabEmail");
+  var tabPhone = document.getElementById("tabPhone");
+  var inLabel  = document.getElementById("inLabel");
+  var input    = document.getElementById("signupInput");
+  var err      = document.getElementById("signupErr");
+  var mode = "email";
+
+  function setMode(m){
+    mode = m;
+    tabEmail.classList.toggle("active", m==="email");
+    tabPhone.classList.toggle("active", m==="phone");
+    if(m==="email"){
+      inLabel.textContent = "Email address";
+      input.type = "email"; input.placeholder = "you@example.com"; input.autocomplete="email";
+      err.textContent = "Enter a valid email address.";
+    } else {
+      inLabel.textContent = "Phone number";
+      input.type = "tel"; input.placeholder = "+1 555 000 1234"; input.autocomplete="tel";
+      err.textContent = "Enter a valid phone number.";
+    }
+    input.value=""; err.classList.remove("show");
+  }
+  tabEmail.addEventListener("click", function(){ setMode("email"); });
+  tabPhone.addEventListener("click", function(){ setMode("phone"); });
+
+  var stepDetails = document.getElementById("stepDetails");
+  var stepVerify  = document.getElementById("stepVerify");
+  var stepDone    = document.getElementById("stepDone");
+  var dest        = document.getElementById("dest");
+  var codeBoxes   = document.getElementById("codeBoxes");
+  var codeInputs  = Array.prototype.slice.call(codeBoxes.querySelectorAll("input"));
+
+  function validEmail(v){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v); }
+  function validPhone(v){ return /^[+]?[\d\s().-]{7,}$/.test(v); }
+
+  document.getElementById("createBtn").addEventListener("click", function(){
+    var v = input.value.trim();
+    var ok = mode==="email" ? validEmail(v) : validPhone(v);
+    if(!ok){ err.classList.add("show"); input.focus(); return; }
+    err.classList.remove("show");
+    dest.textContent = v;
+    stepDetails.style.display = "none";
+    stepVerify.classList.add("show");
+    setTimeout(function(){ codeInputs[0].focus(); }, 60);
+  });
+
+  document.getElementById("backBtn").addEventListener("click", function(){
+    stepVerify.classList.remove("show");
+    stepDetails.style.display = "block";
+    codeInputs.forEach(function(i){ i.value=""; });
+  });
+
+  document.getElementById("resendBtn").addEventListener("click", function(){
+    codeInputs.forEach(function(i){ i.value=""; });
+    codeInputs[0].focus();
+  });
+
+  function checkCode(){
+    var full = codeInputs.every(function(i){ return i.value.length===1; });
+    if(full){
+      stepVerify.classList.remove("show");
+      stepDone.classList.add("show");
+    }
+  }
+  codeInputs.forEach(function(inp, i){
+    inp.addEventListener("input", function(){
+      inp.value = inp.value.replace(/\D/g,"").slice(0,1);
+      if(inp.value && i < codeInputs.length-1) codeInputs[i+1].focus();
+      checkCode();
+    });
+    inp.addEventListener("keydown", function(e){
+      if(e.key==="Backspace" && !inp.value && i>0) codeInputs[i-1].focus();
+    });
+    inp.addEventListener("paste", function(e){
+      e.preventDefault();
+      var digits = (e.clipboardData.getData("text")||"").replace(/\D/g,"").slice(0,6).split("");
+      digits.forEach(function(d,k){ if(codeInputs[k]) codeInputs[k].value=d; });
+      (codeInputs[digits.length] || codeInputs[5]).focus();
+      checkCode();
+    });
+  });
+
+  document.getElementById("restartBtn").addEventListener("click", function(){
+    stepDone.classList.remove("show");
+    codeInputs.forEach(function(i){ i.value=""; });
+    setMode("email");
+    stepDetails.style.display = "block";
+  });
+
+})();
+</script>
+</body>
+</html>
