@@ -59,10 +59,15 @@ button{font-family:inherit;}
 .head-add:hover{background:var(--iris-deep);}
 .head-add svg{width:46%;height:46%;}
 
-.fig-torso{width:64%;height:42%;top:17%;left:50%;transform:translateX(-50%);z-index:2;overflow:visible;}
-.figure-stage[data-gender="male"] .fig-torso{width:62%;height:44%;top:16%;}
-.fig-legs{width:54%;height:31%;top:59%;left:50%;transform:translateX(-50%);z-index:2;overflow:visible;}
-.figure-stage[data-gender="male"] .fig-legs{width:50%;height:30%;top:60%;}
+/* width+top anchor the garment to the shoulder/waist line; height is driven
+   per-item by JS (aspect-ratio set from the cutout's real pixel size), so a
+   jacket, t-shirt or dress each extend down by their own true proportions
+   instead of being squeezed into one fixed box. min/max-height guard against
+   a badly-cropped photo stretching past the figure. */
+.fig-torso{width:64%;height:auto;min-height:16%;max-height:84%;top:17%;left:50%;transform:translateX(-50%);z-index:3;overflow:visible;}
+.figure-stage[data-gender="male"] .fig-torso{width:62%;top:16%;}
+.fig-legs{width:54%;height:auto;min-height:14%;max-height:42%;top:59%;left:50%;transform:translateX(-50%);z-index:2;overflow:visible;}
+.figure-stage[data-gender="male"] .fig-legs{width:50%;top:60%;}
 .slot-img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:none;}
 .slot-img[src]{display:block;}
 
@@ -91,7 +96,7 @@ button{font-family:inherit;}
 
 .pop{animation:pop .38s ease;}
 @keyframes pop{0%{transform:scale(.78) translateX(-50%);}50%{transform:scale(1.08) translateX(-50%);}100%{transform:scale(1) translateX(-50%);}}
-.fig-shoe.pop, .slot-bag.pop, .slot-hat.pop, .slot-glasses.pop, .slot-watch.pop{animation:popPlain .38s ease;}
+.fig-shoe.pop, .slot-bag.pop, .slot-hat.pop, .slot-glasses.pop, .slot-watch.pop, .slot-img.pop{animation:popPlain .38s ease;}
 @keyframes popPlain{0%{transform:scale(.78);}50%{transform:scale(1.1);}100%{transform:scale(1);}}
 
 /* sizes */

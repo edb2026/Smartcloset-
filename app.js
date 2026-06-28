@@ -225,8 +225,12 @@
     if (category === 'top' || category === 'bottom' || category === 'shoes') {
       const target = category === 'shoes' ? 0 : 90;
       const theta = principalAngleDeg(imgData, w, h, box);
-      let diff = angleDiffToTarget(theta, target);
-      diff = Math.max(-20, Math.min(20, diff));
+      const rawDiff = angleDiffToTarget(theta, target);
+      // Only correct a slight photography tilt. A large mismatch usually means
+      // the garment is naturally wider/squarer than tall (a boxy crop top, an
+      // open blazer), not tilted - rotating it would distort the shape instead
+      // of straightening it.
+      const diff = Math.abs(rawDiff) <= 25 ? rawDiff : 0;
 
       if (Math.abs(diff) > 1.5) {
         let rotated = rotateCanvas(canvas, diff, w, h);
@@ -331,16 +335,16 @@
 
   function seedDemoWardrobe() {
     const demo = [
-      { category: 'top', name: 'Demo: T-shirt', svg: DEMO_SVG.tshirt },
-      { category: 'top', name: 'Demo: Shirt', svg: DEMO_SVG.shirt },
-      { category: 'bottom', name: 'Demo: Jeans', svg: DEMO_SVG.jeans },
-      { category: 'bottom', name: 'Demo: Shorts', svg: DEMO_SVG.shorts },
-      { category: 'shoes', name: 'Demo: Sneakers', svg: DEMO_SVG.sneaker },
-      { category: 'shoes', name: 'Demo: Sandals', svg: DEMO_SVG.sandal },
-      { category: 'accessories', subtype: 'bag', name: 'Demo: Bag', svg: DEMO_SVG.bag },
-      { category: 'accessories', subtype: 'glasses', name: 'Demo: Glasses', svg: DEMO_SVG.glasses },
-      { category: 'accessories', subtype: 'hat', name: 'Demo: Hat', svg: DEMO_SVG.hat },
-      { category: 'accessories', subtype: 'watch', name: 'Demo: Watch', svg: DEMO_SVG.watch },
+      { category: 'top', name: 'Demo: T-shirt', svg: DEMO_SVG.tshirt, w: 200, h: 220 },
+      { category: 'top', name: 'Demo: Shirt', svg: DEMO_SVG.shirt, w: 200, h: 220 },
+      { category: 'bottom', name: 'Demo: Jeans', svg: DEMO_SVG.jeans, w: 180, h: 260 },
+      { category: 'bottom', name: 'Demo: Shorts', svg: DEMO_SVG.shorts, w: 180, h: 170 },
+      { category: 'shoes', name: 'Demo: Sneakers', svg: DEMO_SVG.sneaker, w: 220, h: 120 },
+      { category: 'shoes', name: 'Demo: Sandals', svg: DEMO_SVG.sandal, w: 220, h: 100 },
+      { category: 'accessories', subtype: 'bag', name: 'Demo: Bag', svg: DEMO_SVG.bag, w: 160, h: 160 },
+      { category: 'accessories', subtype: 'glasses', name: 'Demo: Glasses', svg: DEMO_SVG.glasses, w: 200, h: 90 },
+      { category: 'accessories', subtype: 'hat', name: 'Demo: Hat', svg: DEMO_SVG.hat, w: 200, h: 120 },
+      { category: 'accessories', subtype: 'watch', name: 'Demo: Watch', svg: DEMO_SVG.watch, w: 120, h: 160 },
     ];
     state.wardrobe = demo.map((d) => ({
       id: uid(),
@@ -348,6 +352,8 @@
       subtype: d.subtype,
       name: d.name,
       src: svgDataUrl(d.svg),
+      w: d.w,
+      h: d.h,
       demo: true,
     }));
   }
@@ -365,6 +371,16 @@
       img.removeAttribute('src');
     }
     if (el.classList.contains('fig-accessory')) el.classList.toggle('filled', !!item);
+  }
+
+  // Sizes a garment slot from the item's own cutout proportions instead of a
+  // fixed box: width/top stay anchored to the body's shoulder/waist line
+  // (set in CSS), height is derived from the item's real aspect ratio so a
+  // cropped t-shirt, a longer jacket and a full-length dress each extend
+  // down by their true length. CSS min/max-height clamp the rare extreme case.
+  function applyDynamicFit(sel, item) {
+    const el = $(sel);
+    el.style.aspectRatio = (item && item.w && item.h) ? `${item.w} / ${item.h}` : '';
   }
 
   function popAnimate(el) {
@@ -392,7 +408,9 @@
     }
 
     setSlotImage('#slotTop', state.equipped.top);
+    applyDynamicFit('#figTorso', state.equipped.top);
     setSlotImage('#slotBottom', state.equipped.bottom);
+    applyDynamicFit('#figLegs', state.equipped.bottom);
     setSlotImage('#slotShoeL', state.equipped.shoes);
     setSlotImage('#slotShoeR', state.equipped.shoes, true);
     setSlotImage('#slotBag', state.equipped.bag);
