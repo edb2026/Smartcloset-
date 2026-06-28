@@ -857,9 +857,213 @@
     renderFigure();
   }
 
+  /* ===== trip planning ===== */
+  var STORAGE_PLANS = "smartwardrobe:plans";
+  var STORAGE_PLAN_NEXTID = "smartwardrobe:plans:nextId";
+  var plans = [];
+  var nextPlanId = 1;
+  var planLocMode = "current";
+  var planDest = null; // {lat,lon,label} chosen destination, only used when planLocMode==="destination"
+
+  function persistPlans(){
+    try{
+      localStorage.setItem(STORAGE_PLANS, JSON.stringify(plans));
+      localStorage.setItem(STORAGE_PLAN_NEXTID, String(nextPlanId));
+    }catch(e){}
+  }
+  function restorePlans(){
+    try{
+      var raw = localStorage.getItem(STORAGE_PLANS);
+      if(raw){
+        var saved = JSON.parse(raw);
+        if(Array.isArray(saved)) plans = saved;
+      }
+      var savedNextId = parseInt(localStorage.getItem(STORAGE_PLAN_NEXTID), 10);
+      nextPlanId = isNaN(savedNextId) ? (plans.reduce(function(m,p){ return Math.max(m, p.id||0); }, 0) + 1) : savedNextId;
+    }catch(e){ plans = []; }
+  }
+
+  var planForm=document.getElementById("planForm"), planName=document.getElementById("planName"), planDate=document.getElementById("planDate"),
+      planLocSeg=document.getElementById("planLocSeg"), planDestWrap=document.getElementById("planDestWrap"),
+      planDestInput=document.getElementById("planDestInput"), planDestSearchBtn=document.getElementById("planDestSearchBtn"),
+      planDestSuggest=document.getElementById("planDestSuggest"), planDestPicked=document.getElementById("planDestPicked"),
+      planFormStatus=document.getElementById("planFormStatus"), planList=document.getElementById("planList"), planEmpty=document.getElementById("planEmpty");
+
+  function setPlanFormStatus(text, isErr){
+    planFormStatus.textContent = text || "";
+    planFormStatus.classList.toggle("err", !!isErr);
+  }
+
+  Array.prototype.forEach.call(planLocSeg.querySelectorAll("button"), function(b){
+    b.addEventListener("click", function(){
+      planLocMode = b.getAttribute("data-loc");
+      Array.prototype.forEach.call(planLocSeg.querySelectorAll("button"), function(x){ x.classList.toggle("active", x===b); });
+      planDestWrap.hidden = planLocMode !== "destination";
+    });
+  });
+
+  function planSearchDestination(){
+    var q = planDestInput.value.trim();
+    if(!q) return;
+    setPlanFormStatus("Searching…");
+    planDestSuggest.hidden = true; planDestSuggest.innerHTML = "";
+    fetch("https://geocoding-api.open-meteo.com/v1/search?name="+encodeURIComponent(q)+"&count=5&language=en&format=json")
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        var results = (d && d.results) || [];
+        if(!results.length){ setPlanFormStatus("No matching city found.", true); return; }
+        setPlanFormStatus("");
+        planDestSuggest.hidden = false;
+        results.forEach(function(res){
+          var label = res.name + (res.admin1?", "+res.admin1:"") + (res.country?", "+res.country:"");
+          var b=document.createElement("button"); b.type="button"; b.textContent=label;
+          b.addEventListener("click", function(){
+            planDestSuggest.hidden = true;
+            planDest = {lat:res.latitude, lon:res.longitude, label:label};
+            planDestPicked.textContent = "Picked: " + label;
+            planDestPicked.classList.add("set");
+          });
+          planDestSuggest.appendChild(b);
+        });
+      })
+      .catch(function(){ setPlanFormStatus("Couldn't search right now — try again in a moment.", true); });
+  }
+  planDestSearchBtn.addEventListener("click", planSearchDestination);
+  planDestInput.addEventListener("keydown", function(e){ if(e.key==="Enter"){ e.preventDefault(); planSearchDestination(); } });
+
+  function pad2(n){ return n<10 ? "0"+n : String(n); }
+  function dateKey(d){ return d.getFullYear()+"-"+pad2(d.getMonth()+1)+"-"+pad2(d.getDate()); }
+  function startOfDay(d){ return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
+  function daysBetween(a,b){ return Math.round((startOfDay(b).getTime()-startOfDay(a).getTime())/86400000); }
+  function formatPlanDate(dateStr){
+    var d = new Date(dateStr+"T00:00:00");
+    return d.toLocaleDateString(undefined, {weekday:"short", month:"short", day:"numeric"});
+  }
+  function daysUntilLabel(days){
+    if(days===0) return "today";
+    if(days===1) return "tomorrow";
+    if(days>1) return "in "+days+" days";
+    return "past";
+  }
+
+  function loadPlanForecast(plan, bodyEl){
+    fetch("https://api.open-meteo.com/v1/forecast?latitude="+plan.loc.lat+"&longitude="+plan.loc.lon+
+          "&daily=temperature_2m_max,temperature_2m_min,weather_code&timezone=auto&start_date="+plan.date+"&end_date="+plan.date)
+      .then(function(r){ if(!r.ok) throw new Error("forecast failed"); return r.json(); })
+      .then(function(data){
+        var daily = data && data.daily;
+        if(!daily || !daily.time || !daily.time.length) throw new Error("no data");
+        var tmax = daily.temperature_2m_max[0], tmin = daily.temperature_2m_min[0];
+        var avgT = (tmax+tmin)/2;
+        var info = wmoInfo(daily.weather_code[0]);
+        var band = tempBand(avgT);
+        var rainy = info.group==="rain" || info.group==="storm" || info.group==="snow";
+        var needOuter = band==="cold" || band==="cool" || rainy;
+        if(!hasEnough()) loadSample();
+        var combo = buildOutfit(needOuter);
+        var chipText = band==="hot"?"Hot day":band==="warm"?"Warm day":band==="mild"?"Mild day":band==="cool"?"Cool day":"Cold day";
+        if(rainy) chipText += " · " + info.label;
+        var piecesHtml = combo.map(function(x){
+          return '<div class="piece"><div class="swatch" style="'+pieceSwatchStyle(x.item)+'"></div>'+
+                 '<div class="nm">'+x.item.name+'</div><div class="ty">'+x.role+'</div></div>';
+        }).join("");
+        bodyEl.innerHTML =
+          '<div class="plan-forecast-row"><span class="pf-emoji">'+info.emoji+'</span>'+
+          '<span class="pf-temp">'+Math.round(avgT)+'°</span><span class="pf-cond">'+info.label+'</span></div>'+
+          '<div class="outfit show"><div class="outfit-head"><h4>Suggested outfit</h4><span class="occ-chip">'+chipText+'</span></div>'+
+          '<div class="pieces">'+piecesHtml+'</div></div>';
+      })
+      .catch(function(){
+        bodyEl.innerHTML = '<p class="plan-pending">Couldn\'t load the forecast — try again later.</p>';
+      });
+  }
+
+  function renderPlans(){
+    planList.innerHTML = "";
+    if(!plans.length){
+      planList.appendChild(planEmpty);
+      return;
+    }
+    var sorted = plans.slice().sort(function(a,b){ return a.date<b.date?-1:a.date>b.date?1:0; });
+    sorted.forEach(function(plan){
+      var card = document.createElement("div");
+      card.className = "plan-card";
+      var head = document.createElement("div");
+      head.className = "plan-card-head";
+      var info = document.createElement("div");
+      var h4 = document.createElement("h4"); h4.textContent = plan.name;
+      var days = daysBetween(new Date(), new Date(plan.date+"T00:00:00"));
+      var meta = document.createElement("p"); meta.className = "plan-meta";
+      meta.textContent = formatPlanDate(plan.date) + " · " + daysUntilLabel(days) + " · 🌍 " + plan.loc.label;
+      info.appendChild(h4); info.appendChild(meta);
+      var rm = document.createElement("button"); rm.className="plan-rm"; rm.type="button"; rm.setAttribute("aria-label","Remove plan"); rm.textContent="×";
+      rm.addEventListener("click", function(){
+        plans = plans.filter(function(p){ return p.id!==plan.id; });
+        persistPlans(); renderPlans();
+      });
+      head.appendChild(info); head.appendChild(rm);
+      var body = document.createElement("div");
+      body.className = "plan-body";
+      card.appendChild(head); card.appendChild(body);
+      planList.appendChild(card);
+
+      if(days<0){
+        body.innerHTML = '<p class="plan-pending">This date has passed.</p>';
+      } else if(days>15){
+        body.innerHTML = '<p class="plan-pending">Forecast opens up 16 days before the date — check back closer to it.</p>';
+      } else {
+        body.innerHTML = '<p class="plan-pending">Loading forecast…</p>';
+        loadPlanForecast(plan, body);
+      }
+    });
+  }
+
+  planForm.addEventListener("submit", function(e){
+    e.preventDefault();
+    var name = planName.value.trim();
+    var dStr = planDate.value;
+    if(!name || !dStr) return;
+    setPlanFormStatus("");
+
+    function commit(loc){
+      plans.push({id: nextPlanId++, name: name, date: dStr, loc: loc});
+      persistPlans();
+      planName.value = ""; planDate.value = "";
+      planDest = null; planDestPicked.textContent = ""; planDestPicked.classList.remove("set");
+      setPlanFormStatus("");
+      renderPlans();
+    }
+
+    if(planLocMode==="destination"){
+      if(!planDest){ setPlanFormStatus("Search and pick a destination city first.", true); return; }
+      commit({mode:"destination", lat:planDest.lat, lon:planDest.lon, label:planDest.label});
+    } else {
+      var saved = loadSavedLoc();
+      if(saved && saved.mode==="manual" && saved.lat!=null){
+        commit({mode:"current", lat:saved.lat, lon:saved.lon, label:saved.label||"Your current location"});
+      } else if(navigator.geolocation){
+        setPlanFormStatus("Detecting your location…");
+        navigator.geolocation.getCurrentPosition(function(pos){
+          commit({mode:"current", lat:pos.coords.latitude, lon:pos.coords.longitude, label:"Your current location"});
+        }, function(){
+          setPlanFormStatus("Location access denied — choose a destination instead.", true);
+        }, {timeout:10000});
+      } else {
+        setPlanFormStatus("Location isn't available — choose a destination instead.", true);
+      }
+    }
+  });
+
+  function initPlanning(){
+    restorePlans();
+    planDate.min = dateKey(new Date());
+    renderPlans();
+  }
+
   /* ===== init ===== */
   restoreWardrobe();
   renderItems(); renderRail(); updateCounts(); refreshGenAvailability();
   initWeather();
   initAvatar();
+  initPlanning();
 })();

@@ -316,6 +316,43 @@
         <div class="pill-list"><span>Avoid repeats</span><span>Best looks</span><span>Most worn</span></div>
       </div>
     </div>
+
+    <div class="tryon-grid plan-app">
+      <div class="tryon-controls plan-form-card">
+        <h3>Add a plan</h3>
+        <form id="planForm">
+          <div class="ctl-group">
+            <label class="ctl-label" for="planName">Event name</label>
+            <input type="text" id="planName" placeholder="Beach weekend" required />
+          </div>
+          <div class="ctl-group">
+            <label class="ctl-label" for="planDate">Date</label>
+            <input type="date" id="planDate" required />
+          </div>
+          <div class="ctl-group">
+            <span class="ctl-label">Location</span>
+            <div class="seg" id="planLocSeg">
+              <button type="button" data-loc="current" class="active">Current location</button>
+              <button type="button" data-loc="destination">A destination</button>
+            </div>
+          </div>
+          <div class="ctl-group plan-dest" id="planDestWrap" hidden>
+            <span class="ctl-label">Destination</span>
+            <div class="wcity-form">
+              <input type="text" id="planDestInput" placeholder="Search a city…" aria-label="Destination city" autocomplete="off" />
+              <button class="btn btn-ghost" type="button" id="planDestSearchBtn">Search</button>
+            </div>
+            <div class="wcity-suggest" id="planDestSuggest" hidden></div>
+            <p class="plan-dest-picked" id="planDestPicked"></p>
+          </div>
+          <button class="btn btn-primary" type="submit">Add plan</button>
+          <p class="plan-form-status" id="planFormStatus"></p>
+        </form>
+      </div>
+      <div class="plan-list" id="planList">
+        <p class="plan-empty" id="planEmpty">No plans yet — add a date above and Smart Wardrobe will line up the forecast and an outfit once it's close enough to call.</p>
+      </div>
+    </div>
   </div>
 </section>
 
