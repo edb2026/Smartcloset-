@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Виртуальная примерочная — Smart Wardrobe</title>
+<title>Virtual Fitting Room — Smart Wardrobe</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700;12..96,800&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
@@ -15,11 +15,11 @@
 <template id="figureTpl">
   <div class="figure-stage" id="figureStage" data-size="m" data-gender="female">
     <div class="fig-scale" id="figScale">
-      <img class="fig-photo" id="figPhoto" src="assets/silhouette-female.png" alt="Силуэт фигуры">
+      <img class="fig-photo" id="figPhoto" src="assets/silhouette-female.png" alt="Body silhouette">
       <div class="fig-accessory slot-hat" id="slotHat"><img alt=""></div>
       <div class="fig-head" id="figHead">
         <div class="head-photo empty" id="headPhoto"></div>
-        <button class="head-add" id="headAddBtn" type="button" aria-label="Добавить фото лица" title="Добавить фото лица">
+        <button class="head-add" id="headAddBtn" type="button" aria-label="Add face photo" title="Add face photo">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
         </button>
         <input type="file" id="headFileInput" accept="image/*" hidden>
@@ -30,8 +30,8 @@
       <div class="fig-accessory slot-bag side-right" id="slotBag">
         <img alt="">
         <div class="bag-flip" id="bagFlip">
-          <button type="button" data-dir="left" aria-label="Сумка слева">‹</button>
-          <button type="button" data-dir="right" aria-label="Сумка справа">›</button>
+          <button type="button" data-dir="left" aria-label="Bag left">‹</button>
+          <button type="button" data-dir="right" aria-label="Bag right">›</button>
         </div>
       </div>
       <div class="fig-legs" id="figLegs"><img class="slot-img" id="slotBottom" alt=""></div>
@@ -46,22 +46,22 @@
 <!-- ============ SCREEN 1 — SETUP ============ -->
 <section class="screen" id="screenSetup">
   <div class="setup-wrap">
-    <span class="eyebrow">Виртуальная примерочная</span>
-    <h1>Создайте свой силуэт</h1>
-    <p class="lead">Добавьте фото лица и выберите размер фигуры — на следующем шаге наполните примерочную одеждой из своего шкафа.</p>
+    <span class="eyebrow">Virtual Fitting Room</span>
+    <h1>Create your silhouette</h1>
+    <p class="lead">Add a face photo and choose your body size — on the next step, fill the fitting room with clothes from your wardrobe.</p>
 
     <div class="setup-figure-zone" id="setupFigureSlot"></div>
 
     <div class="gender-picker">
-      <span class="sp-label">Пол</span>
+      <span class="sp-label">Gender</span>
       <div class="gender-chips" id="genderChips">
-        <button type="button" data-gender="female" class="active">Женский</button>
-        <button type="button" data-gender="male">Мужской</button>
+        <button type="button" data-gender="female" class="active">Female</button>
+        <button type="button" data-gender="male">Male</button>
       </div>
     </div>
 
     <div class="size-picker">
-      <span class="sp-label">Размер силуэта</span>
+      <span class="sp-label">Silhouette size</span>
       <div class="size-chips" id="sizeChips">
         <button type="button" data-size="s">S</button>
         <button type="button" data-size="m" class="active">M</button>
@@ -71,15 +71,15 @@
       </div>
     </div>
 
-    <button class="btn-continue" id="continueBtn" type="button">Продолжить в примерочную →</button>
+    <button class="btn-continue" id="continueBtn" type="button">Continue to fitting room →</button>
   </div>
 </section>
 
 <!-- ============ SCREEN 2 — FITTING ROOM ============ -->
 <section class="screen" id="screenFit" hidden>
   <header class="fit-top">
-    <button class="back-btn" id="backBtn" type="button">← Силуэт и размер</button>
-    <div class="brand"><span class="brand-mark"></span> Примерочная</div>
+    <button class="back-btn" id="backBtn" type="button">← Silhouette and size</button>
+    <div class="brand"><span class="brand-mark"></span> Fitting Room</div>
   </header>
 
   <div class="scene" id="scene" data-bg="city-day">
@@ -92,11 +92,11 @@
     </div>
 
     <div class="bg-picker" id="bgPicker">
-      <button type="button" data-bg="city-day" class="active">Город днём</button>
-      <button type="button" data-bg="office">Офис</button>
-      <button type="button" data-bg="street">Улица города</button>
-      <button type="button" data-bg="restaurant">Ресторан</button>
-      <button type="button" data-bg="beach">Пляж</button>
+      <button type="button" data-bg="city-day" class="active">City by day</button>
+      <button type="button" data-bg="office">Office</button>
+      <button type="button" data-bg="street">City street</button>
+      <button type="button" data-bg="restaurant">Restaurant</button>
+      <button type="button" data-bg="beach">Beach</button>
     </div>
 
     <div class="fit-figure-zone" id="fitFigureSlot"></div>
@@ -104,29 +104,29 @@
 
   <div class="wardrobe-panel">
     <div class="wp-head">
-      <h2>Мой шкаф</h2>
-      <span class="wp-count" id="wpCount">0 вещей</span>
+      <h2>My Wardrobe</h2>
+      <span class="wp-count" id="wpCount">0 items</span>
     </div>
 
     <div class="wp-tabs" id="wpTabs">
-      <button type="button" data-cat="top" class="active">Верх</button>
-      <button type="button" data-cat="bottom">Низ</button>
-      <button type="button" data-cat="shoes">Обувь</button>
-      <button type="button" data-cat="accessories">Аксессуары</button>
+      <button type="button" data-cat="top" class="active">Top</button>
+      <button type="button" data-cat="bottom">Bottom</button>
+      <button type="button" data-cat="shoes">Shoes</button>
+      <button type="button" data-cat="accessories">Accessories</button>
     </div>
 
     <div class="acc-filter" id="accFilterBar" hidden>
-      <button type="button" data-sub="all">Все</button>
-      <button type="button" data-sub="bag" class="active">Сумки</button>
-      <button type="button" data-sub="glasses">Очки</button>
-      <button type="button" data-sub="hat">Шляпы</button>
-      <button type="button" data-sub="watch">Часы</button>
+      <button type="button" data-sub="all">All</button>
+      <button type="button" data-sub="bag" class="active">Bags</button>
+      <button type="button" data-sub="glasses">Glasses</button>
+      <button type="button" data-sub="hat">Hats</button>
+      <button type="button" data-sub="watch">Watches</button>
     </div>
 
-    <p class="wp-hint">Совет: фотографируйте вещи на однотонном фоне — так ИИ точнее выровняет и обрежет силуэт.</p>
+    <p class="wp-hint">Tip: photograph items on a plain background — this helps the AI align and crop the silhouette more accurately.</p>
 
     <div class="wp-grid" id="wpGrid"></div>
-    <p class="wp-empty" id="wpEmptyHint" hidden>В этой категории пока пусто — добавьте фото.</p>
+    <p class="wp-empty" id="wpEmptyHint" hidden>This category is empty — add a photo.</p>
     <input type="file" id="itemFileInput" accept="image/*" multiple hidden>
   </div>
 </section>
@@ -135,7 +135,7 @@
 <div class="ai-overlay" id="aiOverlay" hidden>
   <div class="ai-box">
     <div class="ai-spinner"></div>
-    <p id="aiStatus">ИИ обрабатывает фото…</p>
+    <p id="aiStatus">AI is processing the photo…</p>
   </div>
 </div>
 
