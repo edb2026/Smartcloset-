@@ -57,85 +57,141 @@
   }
 
   // Background removal: flood fill from the border, treating a pixel as
-  // background if it matches one of several color clusters sampled along
-  // the border (handles scenes with more than one background region, e.g.
-  // a closet wall plus shelving) OR is close to the neighbor that reached
-  // it (handles smooth gradients/shadows within a single region).
+  // background only if its color matches one of several clusters sampled
+  // along the border (handles scenes with more than one background region,
+  // e.g. a closet wall plus shelving). Growth is connectivity-only - a
+  // pixel's match is always checked against the original border colors,
+  // never against whatever its neighbor was reclassified as. A "close to
+  // the previous pixel" rule was tried here before, but it let the fill
+  // walk arbitrarily far from the sampled colors over many small steps,
+  // which could eat straight through a garment whose color is only subtly
+  // different from the background - exactly the case where preserving the
+  // garment's real color matters most.
+  //
+  // Even with that fixed, a garment that's simply close in color to its
+  // background (a white tee on a light wall) can still match the cluster
+  // threshold directly. Since erasing the clothing itself is far worse than
+  // leaving a sliver of background behind, a single attempt that clears out
+  // most of the photo is retried with a tighter threshold until a
+  // garment-sized region survives. The retained pixel COUNT isn't a safe
+  // signal for "did the garment survive" - a high-contrast logo or seam can
+  // stay opaque while the rest of the garment is erased around it, which
+  // looks fine by raw count but is exactly the failure being guarded
+  // against. So the check instead looks at the size of the largest
+  // connected opaque region: a real garment survives as one big blob, while
+  // an over-aggressive cut leaves only small disconnected fragments.
   function removeBackground(ctx, w, h, threshold = 38) {
-    const imgData = ctx.getImageData(0, 0, w, h);
-    const d = imgData.data;
+    const original = ctx.getImageData(0, 0, w, h);
+    const od = original.data;
 
     let transparentCount = 0;
-    for (let i = 3; i < d.length; i += 4) if (d[i] < 200) transparentCount++;
-    if (transparentCount / (w * h) > 0.04) return imgData; // already cut out
+    for (let i = 3; i < od.length; i += 4) if (od[i] < 200) transparentCount++;
+    if (transparentCount / (w * h) > 0.04) return original; // already cut out
 
-    const clusters = [];
-    const mergeDist = 30;
-    function addSample(r, g, b) {
-      for (const c of clusters) {
-        if (colorDist(r, g, b, c.r, c.g, c.b) <= mergeDist) {
-          c.r = (c.r * c.n + r) / (c.n + 1);
-          c.g = (c.g * c.n + g) / (c.n + 1);
-          c.b = (c.b * c.n + b) / (c.n + 1);
-          c.n++;
-          return;
+    function attempt(thr) {
+      const imgData = new ImageData(new Uint8ClampedArray(od), w, h);
+      const d = imgData.data;
+
+      const clusters = [];
+      const mergeDist = 30;
+      function addSample(r, g, b) {
+        for (const c of clusters) {
+          if (colorDist(r, g, b, c.r, c.g, c.b) <= mergeDist) {
+            c.r = (c.r * c.n + r) / (c.n + 1);
+            c.g = (c.g * c.n + g) / (c.n + 1);
+            c.b = (c.b * c.n + b) / (c.n + 1);
+            c.n++;
+            return;
+          }
+        }
+        if (clusters.length < 16) clusters.push({ r, g, b, n: 1 });
+      }
+      for (let x = 0; x < w; x++) {
+        let i = x * 4; addSample(d[i], d[i + 1], d[i + 2]);
+        i = ((h - 1) * w + x) * 4; addSample(d[i], d[i + 1], d[i + 2]);
+      }
+      for (let y = 0; y < h; y++) {
+        let i = (y * w) * 4; addSample(d[i], d[i + 1], d[i + 2]);
+        i = (y * w + w - 1) * 4; addSample(d[i], d[i + 1], d[i + 2]);
+      }
+      function matchesBackground(r, g, b) {
+        for (const c of clusters) if (colorDist(r, g, b, c.r, c.g, c.b) <= thr) return true;
+        return false;
+      }
+
+      const visited = new Uint8Array(w * h);
+      const queue = new Int32Array(w * h);
+      let qh = 0, qt = 0;
+
+      function seed(x, y) {
+        const idx = y * w + x;
+        if (visited[idx]) return;
+        visited[idx] = 1;
+        d[idx * 4 + 3] = 0;
+        queue[qt++] = idx;
+      }
+      // The whole border is assumed to be background (the item shouldn't touch the frame edge).
+      for (let x = 0; x < w; x++) { seed(x, 0); seed(x, h - 1); }
+      for (let y = 0; y < h; y++) { seed(0, y); seed(w - 1, y); }
+
+      function tryPush(x, y) {
+        if (x < 0 || y < 0 || x >= w || y >= h) return;
+        const idx = y * w + x;
+        if (visited[idx]) return;
+        const i = idx * 4;
+        if (matchesBackground(d[i], d[i + 1], d[i + 2])) {
+          visited[idx] = 1;
+          d[i + 3] = 0;
+          queue[qt++] = idx;
+        } else {
+          visited[idx] = 2;
         }
       }
-      if (clusters.length < 16) clusters.push({ r, g, b, n: 1 });
-    }
-    for (let x = 0; x < w; x++) {
-      let i = x * 4; addSample(d[i], d[i + 1], d[i + 2]);
-      i = ((h - 1) * w + x) * 4; addSample(d[i], d[i + 1], d[i + 2]);
-    }
-    for (let y = 0; y < h; y++) {
-      let i = (y * w) * 4; addSample(d[i], d[i + 1], d[i + 2]);
-      i = (y * w + w - 1) * 4; addSample(d[i], d[i + 1], d[i + 2]);
-    }
-    function matchesBackground(r, g, b) {
-      for (const c of clusters) if (colorDist(r, g, b, c.r, c.g, c.b) <= threshold) return true;
-      return false;
-    }
 
-    const visited = new Uint8Array(w * h);
-    const queue = new Int32Array(w * h);
-    let qh = 0, qt = 0;
-
-    function seed(x, y) {
-      const idx = y * w + x;
-      if (visited[idx]) return;
-      visited[idx] = 1;
-      d[idx * 4 + 3] = 0;
-      queue[qt++] = idx;
-    }
-    // The whole border is assumed to be background (the item shouldn't touch the frame edge).
-    for (let x = 0; x < w; x++) { seed(x, 0); seed(x, h - 1); }
-    for (let y = 0; y < h; y++) { seed(0, y); seed(w - 1, y); }
-
-    const neighborThreshold = threshold * 0.72;
-    function tryPush(x, y, pr, pg, pb) {
-      if (x < 0 || y < 0 || x >= w || y >= h) return;
-      const idx = y * w + x;
-      if (visited[idx]) return;
-      const i = idx * 4;
-      const r = d[i], g = d[i + 1], b = d[i + 2];
-      if (matchesBackground(r, g, b) || colorDist(r, g, b, pr, pg, pb) <= neighborThreshold) {
-        visited[idx] = 1;
-        d[i + 3] = 0;
-        queue[qt++] = idx;
-      } else {
-        visited[idx] = 2;
+      while (qh < qt) {
+        const idx = queue[qh++];
+        const x = idx % w, y = (idx - x) / w;
+        tryPush(x - 1, y); tryPush(x + 1, y);
+        tryPush(x, y - 1); tryPush(x, y + 1);
       }
+
+      // Size of the largest 4-connected opaque region, as a fraction of the
+      // photo - see the note above on why this (and not raw opaque count) is
+      // the signal used to decide whether this attempt kept the garment.
+      const seen = new Uint8Array(w * h);
+      const stack = new Int32Array(w * h);
+      let largest = 0;
+      for (let start = 0; start < w * h; start++) {
+        if (seen[start] || d[start * 4 + 3] <= 200) { seen[start] = 1; continue; }
+        let sp = 0;
+        stack[sp++] = start;
+        seen[start] = 1;
+        let count = 0;
+        while (sp > 0) {
+          const idx = stack[--sp];
+          count++;
+          const x = idx % w, y = (idx - x) / w;
+          const nbrs = [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]];
+          for (const [nx, ny] of nbrs) {
+            if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+            const nIdx = ny * w + nx;
+            if (seen[nIdx] || d[nIdx * 4 + 3] <= 200) { seen[nIdx] = 1; continue; }
+            seen[nIdx] = 1;
+            stack[sp++] = nIdx;
+          }
+        }
+        if (count > largest) largest = count;
+      }
+
+      return { imgData, blobFrac: largest / (w * h) };
     }
 
-    while (qh < qt) {
-      const idx = queue[qh++];
-      const x = idx % w, y = (idx - x) / w;
-      const i = idx * 4;
-      const pr = d[i], pg = d[i + 1], pb = d[i + 2];
-      tryPush(x - 1, y, pr, pg, pb); tryPush(x + 1, y, pr, pg, pb);
-      tryPush(x, y - 1, pr, pg, pb); tryPush(x, y + 1, pr, pg, pb);
+    let result = attempt(threshold);
+    for (const mul of [0.65, 0.45, 0.3, 0.2, 0.13]) {
+      if (result.blobFrac >= 0.15) break;
+      result = attempt(threshold * mul);
     }
-    return imgData;
+    return result.imgData;
   }
 
   function bbox(imgData, w, h) {
