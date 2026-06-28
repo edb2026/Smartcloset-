@@ -10,6 +10,7 @@
 
   const state = {
     size: 'm',
+    gender: 'female',
     headPhoto: null,
     background: 'city-day',
     activeTab: 'top',
@@ -304,6 +305,8 @@
     const stage = $('#figureStage');
     if (!stage) return;
     stage.dataset.size = state.size;
+    stage.dataset.gender = state.gender;
+    $('#figPhoto').src = `assets/silhouette-${state.gender}.png`;
 
     const headPhotoEl = $('#headPhoto');
     if (state.headPhoto) {
@@ -491,6 +494,15 @@
       });
     });
 
+    $$('#genderChips button').forEach((b) => {
+      b.addEventListener('click', () => {
+        state.gender = b.dataset.gender;
+        $$('#genderChips button').forEach((x) => x.classList.toggle('active', x === b));
+        renderFigure();
+        save();
+      });
+    });
+
     $('#continueBtn').addEventListener('click', () => {
       $('#screenFit').hidden = false;
       $('#screenSetup').hidden = true;
@@ -568,6 +580,7 @@
     }
 
     $$('#sizeChips button').forEach((b) => b.classList.toggle('active', b.dataset.size === state.size));
+    $$('#genderChips button').forEach((b) => b.classList.toggle('active', b.dataset.gender === state.gender));
 
     renderFigure();
     renderBackground();

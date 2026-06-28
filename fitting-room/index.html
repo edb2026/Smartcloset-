@@ -13,32 +13,32 @@
 
 <!-- ============ FIGURE (single shared node, moved between screens) ============ -->
 <template id="figureTpl">
-  <div class="figure-stage" id="figureStage" data-size="m">
-    <div class="fig-accessory slot-hat" id="slotHat"><img alt=""></div>
-    <div class="fig-head" id="figHead">
-      <div class="head-photo empty" id="headPhoto"></div>
-      <button class="head-add" id="headAddBtn" type="button" aria-label="Добавить фото лица" title="Добавить фото лица">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-      </button>
-      <input type="file" id="headFileInput" accept="image/*" hidden>
-    </div>
-    <div class="fig-accessory slot-glasses" id="slotGlasses"><img alt=""></div>
-    <div class="fig-neck"></div>
-    <div class="fig-arm fig-arm-l"></div>
-    <div class="fig-arm fig-arm-r"></div>
-    <div class="fig-accessory slot-watch" id="slotWatch"><img alt=""></div>
-    <div class="fig-torso" id="figTorso"><img class="slot-img" id="slotTop" alt=""></div>
-    <div class="fig-accessory slot-bag side-right" id="slotBag">
-      <img alt="">
-      <div class="bag-flip" id="bagFlip">
-        <button type="button" data-dir="left" aria-label="Сумка слева">‹</button>
-        <button type="button" data-dir="right" aria-label="Сумка справа">›</button>
+  <div class="figure-stage" id="figureStage" data-size="m" data-gender="female">
+    <div class="fig-scale" id="figScale">
+      <img class="fig-photo" id="figPhoto" src="assets/silhouette-female.png" alt="Силуэт фигуры">
+      <div class="fig-accessory slot-hat" id="slotHat"><img alt=""></div>
+      <div class="fig-head" id="figHead">
+        <div class="head-photo empty" id="headPhoto"></div>
+        <button class="head-add" id="headAddBtn" type="button" aria-label="Добавить фото лица" title="Добавить фото лица">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+        <input type="file" id="headFileInput" accept="image/*" hidden>
       </div>
-    </div>
-    <div class="fig-legs" id="figLegs"><img class="slot-img" id="slotBottom" alt=""></div>
-    <div class="fig-feet">
-      <div class="fig-shoe fig-shoe-l" id="slotShoeL"><img alt=""></div>
-      <div class="fig-shoe fig-shoe-r" id="slotShoeR"><img alt=""></div>
+      <div class="fig-accessory slot-glasses" id="slotGlasses"><img alt=""></div>
+      <div class="fig-accessory slot-watch" id="slotWatch"><img alt=""></div>
+      <div class="fig-torso" id="figTorso"><img class="slot-img" id="slotTop" alt=""></div>
+      <div class="fig-accessory slot-bag side-right" id="slotBag">
+        <img alt="">
+        <div class="bag-flip" id="bagFlip">
+          <button type="button" data-dir="left" aria-label="Сумка слева">‹</button>
+          <button type="button" data-dir="right" aria-label="Сумка справа">›</button>
+        </div>
+      </div>
+      <div class="fig-legs" id="figLegs"><img class="slot-img" id="slotBottom" alt=""></div>
+      <div class="fig-feet">
+        <div class="fig-shoe fig-shoe-l" id="slotShoeL"><img alt=""></div>
+        <div class="fig-shoe fig-shoe-r" id="slotShoeR"><img alt=""></div>
+      </div>
     </div>
   </div>
 </template>
@@ -51,6 +51,14 @@
     <p class="lead">Добавьте фото лица и выберите размер фигуры — на следующем шаге наполните примерочную одеждой из своего шкафа.</p>
 
     <div class="setup-figure-zone" id="setupFigureSlot"></div>
+
+    <div class="gender-picker">
+      <span class="sp-label">Пол</span>
+      <div class="gender-chips" id="genderChips">
+        <button type="button" data-gender="female" class="active">Женский</button>
+        <button type="button" data-gender="male">Мужской</button>
+      </div>
+    </div>
 
     <div class="size-picker">
       <span class="sp-label">Размер силуэта</span>
