@@ -1,0 +1,513 @@
+(function(){
+  "use strict";
+
+  /* ===== state ===== */
+  var wardrobe = [];           // {id,url,color,category,name,silhouette}
+  var nextId = 1;
+  var CATS = [
+    {key:"top",   label:"Top",        sil:"g-top"},
+    {key:"bottom",label:"Bottom",     sil:"g-pant"},
+    {key:"outer", label:"Outerwear",  sil:"g-coat"},
+    {key:"shoe",  label:"Shoes",      sil:"g-pant"},
+    {key:"acc",   label:"Accessory",  sil:"g-top"}
+  ];
+  function catLabel(k){ for(var i=0;i<CATS.length;i++) if(CATS[i].key===k) return CATS[i].label; return k; }
+  function catSil(k){ for(var i=0;i<CATS.length;i++) if(CATS[i].key===k) return CATS[i].sil; return "g-top"; }
+
+  /* ===== persistence (localStorage) ===== */
+  var STORAGE_ITEMS = "smartwardrobe:items";
+  var STORAGE_NEXTID = "smartwardrobe:nextId";
+  function persistWardrobe(){
+    try{
+      localStorage.setItem(STORAGE_ITEMS, JSON.stringify(wardrobe));
+      localStorage.setItem(STORAGE_NEXTID, String(nextId));
+    }catch(e){
+      // localStorage full or unavailable — wardrobe still works for this session, just won't survive reload
+    }
+  }
+  function restoreWardrobe(){
+    try{
+      var raw = localStorage.getItem(STORAGE_ITEMS);
+      if(!raw) return;
+      var saved = JSON.parse(raw);
+      if(Array.isArray(saved)) wardrobe = saved;
+      var savedNextId = parseInt(localStorage.getItem(STORAGE_NEXTID), 10);
+      nextId = isNaN(savedNextId) ? (wardrobe.reduce(function(m,it){ return Math.max(m, it.id||0); }, 0) + 1) : savedNextId;
+    }catch(e){ wardrobe = []; }
+  }
+
+  /* ===== elements ===== */
+  var fileInput = document.getElementById("fileInput");
+  var dropzone  = document.getElementById("dropzone");
+  var itemGrid  = document.getElementById("itemGrid");
+  var emptyNote = document.getElementById("emptyNote");
+  var itemCount = document.getElementById("itemCount");
+  var heroCount = document.getElementById("heroCount");
+  var clearBtn  = document.getElementById("clearBtn");
+  var rail      = document.getElementById("rail");
+
+  /* ===== downscale to a storable data URL + sample its average color ===== */
+  function resizeAndColor(img, cb){
+    try{
+      var maxDim = 640;
+      var scale = Math.min(1, maxDim / Math.max(img.naturalWidth, img.naturalHeight));
+      var w = Math.max(1, Math.round(img.naturalWidth * scale));
+      var h = Math.max(1, Math.round(img.naturalHeight * scale));
+      var c = document.createElement("canvas"); c.width = w; c.height = h;
+      c.getContext("2d").drawImage(img, 0, 0, w, h);
+      var dataUrl = c.toDataURL("image/jpeg", 0.85);
+
+      var sw = 12, sh = 12, sc = document.createElement("canvas"); sc.width = sw; sc.height = sh;
+      sc.getContext("2d").drawImage(c, 0, 0, sw, sh);
+      var d = sc.getContext("2d").getImageData(0, 0, sw, sh).data, r=0,g=0,b=0,n=0;
+      for(var i=0;i<d.length;i+=4){ r+=d[i]; g+=d[i+1]; b+=d[i+2]; n++; }
+      cb(dataUrl, "rgb("+Math.round(r/n)+","+Math.round(g/n)+","+Math.round(b/n)+")");
+    }catch(e){ cb(null, "#C9C6D2"); }
+  }
+
+  /* ===== add uploaded files ===== */
+  function addFiles(files){
+    var arr = Array.prototype.slice.call(files).filter(function(f){ return /^image\//.test(f.type); });
+    arr.forEach(function(file){
+      var reader = new FileReader();
+      reader.onload = function(){
+        var img = new Image();
+        img.onload = function(){
+          resizeAndColor(img, function(dataUrl, color){
+            var item = { id: nextId++, url: dataUrl, color: color, category: "top", name: "Wardrobe piece", silhouette: "g-top" };
+            wardrobe.push(item);
+            renderItems(); renderRail(); updateCounts(); refreshGenAvailability(); persistWardrobe();
+          });
+        };
+        img.onerror = function(){
+          var item = {id:nextId++, url:null, color:"#C9C6D2", category:"top", name:"Wardrobe piece", silhouette:"g-top"};
+          wardrobe.push(item); renderItems(); renderRail(); updateCounts(); refreshGenAvailability(); persistWardrobe();
+        };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  /* ===== sample wardrobe (no photos needed) ===== */
+  function loadSample(){
+    var sample = [
+      {category:"top",   color:"#F5F4F1", name:"White Oxford shirt"},
+      {category:"top",   color:"#26334F", name:"Navy merino knit"},
+      {category:"top",   color:"#7C2B3B", name:"Burgundy polo"},
+      {category:"bottom",color:"#2B3550", name:"Dark indigo jeans"},
+      {category:"bottom",color:"#C2B49A", name:"Stone chinos"},
+      {category:"bottom",color:"#3A3A40", name:"Charcoal trousers"},
+      {category:"shoe",  color:"#ECECEC", name:"White sneakers"},
+      {category:"shoe",  color:"#6E4326", name:"Brown leather boots"},
+      {category:"outer", color:"#B58A57", name:"Camel overcoat"},
+      {category:"outer", color:"#222E47", name:"Navy blazer"},
+      {category:"acc",   color:"#9A6B43", name:"Tan leather belt"},
+      {category:"acc",   color:"#BFC2C7", name:"Silver watch"}
+    ];
+    sample.forEach(function(s){
+      wardrobe.push({id:nextId++, url:null, color:s.color, category:s.category, name:s.name, silhouette:catSil(s.category)});
+    });
+    renderItems(); renderRail(); updateCounts(); refreshGenAvailability(); persistWardrobe();
+  }
+
+  /* ===== render item grid ===== */
+  function renderItems(){
+    itemGrid.innerHTML = "";
+    wardrobe.forEach(function(it){
+      var card = document.createElement("div");
+      card.className = "item";
+      var ph = document.createElement("div");
+      ph.className = "ph";
+      if(it.url){ ph.style.backgroundImage = "url('"+it.url+"')"; }
+      else { ph.style.background = it.color; }
+      var rm = document.createElement("button");
+      rm.className = "rm"; rm.type="button"; rm.setAttribute("aria-label","Remove item"); rm.textContent="×";
+      rm.addEventListener("click", function(){
+        wardrobe = wardrobe.filter(function(x){ return x.id!==it.id; });
+        renderItems(); renderRail(); updateCounts(); refreshGenAvailability(); persistWardrobe();
+      });
+      ph.appendChild(rm);
+      var meta = document.createElement("div");
+      meta.className = "meta";
+      var sel = document.createElement("select");
+      sel.setAttribute("aria-label","Category");
+      CATS.forEach(function(c){
+        var o = document.createElement("option");
+        o.value=c.key; o.textContent=c.label;
+        if(c.key===it.category) o.selected=true;
+        sel.appendChild(o);
+      });
+      sel.addEventListener("change", function(){
+        it.category = sel.value; it.silhouette = catSil(sel.value);
+        renderRail(); refreshGenAvailability(); persistWardrobe();
+      });
+      meta.appendChild(sel);
+      card.appendChild(ph); card.appendChild(meta);
+      itemGrid.appendChild(card);
+    });
+    emptyNote.style.display = wardrobe.length ? "none" : "block";
+    clearBtn.hidden = wardrobe.length === 0;
+  }
+
+  /* ===== render rail (hero) ===== */
+  function renderRail(){
+    rail.innerHTML = "";
+    var show = wardrobe.slice(0,9);
+    if(show.length === 0){
+      // decorative placeholder rail
+      var demo = [
+        {c:"#23222B",t:"g-top",h:120},{c:"#6E6A78",t:"g-pant",h:150},
+        {c:"#7C2B3B",t:"g-top",h:128},{c:"#B58A57",t:"g-coat",h:165},
+        {c:"#C9A24B",t:"g-top",h:118},{c:"#4F7C58",t:"g-pant",h:150},
+        {c:"#3E7A98",t:"g-coat",h:165},{c:"#4034A8",t:"g-top",h:126},
+        {c:"#C9C6D2",t:"g-pant",h:148}
+      ];
+      demo.forEach(function(g){ railGarment(g.c,null,g.t,g.h); });
+      return;
+    }
+    var heights=[120,150,128,165,118,150,165,126,148];
+    show.forEach(function(it,i){
+      railGarment(it.color, it.url, it.silhouette, heights[i%heights.length]);
+    });
+  }
+  function railGarment(color,url,sil,h){
+    var d=document.createElement("div"); d.className="garment "+sil; d.style.setProperty("--h",h+"px");
+    var b=document.createElement("div"); b.className="g-body";
+    if(url){ b.style.backgroundImage="url('"+url+"')"; } else { b.style.setProperty("--g",color); }
+    d.appendChild(b); rail.appendChild(d);
+  }
+
+  function updateCounts(){
+    itemCount.textContent = wardrobe.length;
+    heroCount.textContent = wardrobe.length + (wardrobe.length===1?" item":" items");
+  }
+
+  /* ===== wiring: upload ===== */
+  document.getElementById("browseBtn").addEventListener("click", function(e){ e.stopPropagation(); fileInput.click(); });
+  document.getElementById("sampleBtn").addEventListener("click", function(e){ e.stopPropagation(); loadSample(); });
+  dropzone.addEventListener("click", function(){ fileInput.click(); });
+  dropzone.addEventListener("keydown", function(e){ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); fileInput.click(); }});
+  fileInput.addEventListener("change", function(){ addFiles(fileInput.files); fileInput.value=""; });
+  ["dragenter","dragover"].forEach(function(ev){ dropzone.addEventListener(ev,function(e){ e.preventDefault(); dropzone.classList.add("drag"); }); });
+  ["dragleave","drop"].forEach(function(ev){ dropzone.addEventListener(ev,function(e){ e.preventDefault(); dropzone.classList.remove("drag"); }); });
+  dropzone.addEventListener("drop", function(e){ if(e.dataTransfer && e.dataTransfer.files) addFiles(e.dataTransfer.files); });
+  clearBtn.addEventListener("click", function(){
+    wardrobe = []; renderItems(); renderRail(); updateCounts(); refreshGenAvailability(); persistWardrobe();
+  });
+
+  /* ===== shared outfit builder ===== */
+  function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+  function byCat(cat){ return wardrobe.filter(function(x){ return x.category===cat; }); }
+  function hasEnough(){ return wardrobe.length >= 2; }
+
+  function buildOutfit(needOuter){
+    var roles = [
+      {cat:"top",   role:"Top"},
+      {cat:"bottom",role:"Bottom"},
+      {cat:"shoe",  role:"Shoes"},
+      {cat:needOuter?"outer":"acc", role:needOuter?"Outerwear":"Accessory"}
+    ];
+    var out = [];
+    roles.forEach(function(r){
+      var pool = byCat(r.cat);
+      if(pool.length) out.push({item:pick(pool), role:r.role});
+    });
+    // if too few matched (e.g. all items same category), just pick any distinct items
+    if(out.length < 2){
+      var shuffled = wardrobe.slice().sort(function(){ return Math.random()-0.5; }).slice(0,4);
+      out = shuffled.map(function(it){ return {item:it, role:catLabel(it.category)}; });
+    }
+    return out;
+  }
+  function pieceSwatchStyle(it){
+    return it.url ? "background-image:url('"+it.url+"')" : "background:"+it.color;
+  }
+
+  /* ===== hero generate ===== */
+  var heroPieces=document.getElementById("heroPieces"), heroOutfit=document.getElementById("heroOutfit"), heroOcc=document.getElementById("heroOcc");
+  document.getElementById("heroGenerate").addEventListener("click", function(){
+    if(!hasEnough()){ loadSample(); }
+    var combo = buildOutfit(Math.random()<0.4);
+    heroPieces.innerHTML = combo.map(function(x){
+      return '<div class="piece"><div class="swatch" style="'+pieceSwatchStyle(x.item)+'"></div>'+
+             '<div class="nm">'+x.item.name+'</div><div class="ty">'+x.role+'</div></div>';
+    }).join("");
+    heroOcc.textContent = "For " + pick(["work","a walk","dinner","the weekend","a meeting"]);
+    heroOutfit.classList.add("show");
+  });
+
+  /* ===== generator section ===== */
+  var OCCASIONS=["Work","Walk","Date","Restaurant","Meeting","Travel","Party","Hot weather","Rain","Cold weather"];
+  var WHY={Work:"Polished and comfortable for a full day.",Walk:"Easy layers you can move in.",Date:"A confident, considered look.",Restaurant:"Smart-casual, dressed up a notch.",Meeting:"Sharp and professional.",Travel:"Comfortable for hours in transit.",Party:"A standout combination from your closet.","Hot weather":"Light pieces that breathe.",Rain:"Water-ready, still put together.","Cold weather":"Warm layers that work together."};
+  var activeOcc="Work";
+  var occWrap=document.getElementById("occasions");
+  OCCASIONS.forEach(function(o,i){
+    var b=document.createElement("button"); b.className="occ"+(i===0?" active":""); b.textContent=o;
+    b.addEventListener("click", function(){
+      occWrap.querySelectorAll(".occ").forEach(function(x){ x.classList.remove("active"); });
+      b.classList.add("active"); activeOcc=o;
+    });
+    occWrap.appendChild(b);
+  });
+
+  var genGrid=document.getElementById("genGrid"), genEmpty=document.getElementById("genEmpty"),
+      genEmptyMsg=document.getElementById("genEmptyMsg"), genAgain=document.getElementById("genAgain"),
+      genWhy=document.getElementById("genWhy"), genBtn=document.getElementById("genBtn");
+
+  function refreshGenAvailability(){
+    genEmptyMsg.textContent = hasEnough()
+      ? "Tap Create an outfit to build a look from your wardrobe."
+      : "Add a few clothes above, then create your look.";
+  }
+
+  function genBuild(){
+    if(!hasEnough()){ loadSample(); }
+    var needOuter = ["Cold weather","Rain","Meeting","Restaurant"].indexOf(activeOcc) > -1;
+    var combo = buildOutfit(needOuter);
+    genGrid.innerHTML = combo.map(function(x){
+      return '<div class="gp"><div class="gsw" style="'+pieceSwatchStyle(x.item)+'"></div>'+
+             '<div class="nm">'+x.item.name+'</div><div class="role">'+x.role+'</div></div>';
+    }).join("");
+    genEmpty.style.display="none"; genGrid.style.display="grid";
+    genAgain.style.display="inline-flex"; genWhy.textContent = WHY[activeOcc]||"";
+  }
+  genBtn.addEventListener("click", genBuild);
+  genAgain.addEventListener("click", genBuild);
+
+  /* ===== match around one item (static demo) ===== */
+  var ANCHORS=[
+    {nm:"White Oxford shirt",c:"#F5F4F1",pairs:[{nm:"Dark indigo jeans",c:"#2B3550",r:"Bottom"},{nm:"Camel overcoat",c:"#B58A57",r:"Outerwear"},{nm:"Brown leather boots",c:"#6E4326",r:"Shoes"},{nm:"Tan leather belt",c:"#9A6B43",r:"Belt"},{nm:"Silver watch",c:"#BFC2C7",r:"Watch"},{nm:"Navy blazer",c:"#222E47",r:"Layer"}]},
+    {nm:"Dark indigo jeans",c:"#2B3550",pairs:[{nm:"White Oxford shirt",c:"#F5F4F1",r:"Top"},{nm:"Navy merino knit",c:"#26334F",r:"Layer"},{nm:"White sneakers",c:"#ECECEC",r:"Shoes"},{nm:"Denim jacket",c:"#3E5A78",r:"Outerwear"},{nm:"Tan leather belt",c:"#9A6B43",r:"Belt"},{nm:"Suede loafers",c:"#8A6B4A",r:"Shoes"}]},
+    {nm:"Camel overcoat",c:"#B58A57",pairs:[{nm:"Navy merino knit",c:"#26334F",r:"Top"},{nm:"Charcoal trousers",c:"#3A3A40",r:"Bottom"},{nm:"Black derbies",c:"#1E1E22",r:"Shoes"},{nm:"Wool scarf",c:"#8C3A4A",r:"Accessory"},{nm:"Leather tote",c:"#5A3C2A",r:"Bag"},{nm:"Silver watch",c:"#BFC2C7",r:"Watch"}]},
+    {nm:"White sneakers",c:"#ECECEC",pairs:[{nm:"Stone chinos",c:"#C2B49A",r:"Bottom"},{nm:"Striped tee",c:"#C9C6D2",r:"Top"},{nm:"Denim jacket",c:"#3E5A78",r:"Outerwear"},{nm:"Dark indigo jeans",c:"#2B3550",r:"Bottom"},{nm:"Olive overshirt",c:"#6B6B43",r:"Layer"},{nm:"Silver watch",c:"#BFC2C7",r:"Watch"}]}
+  ];
+  var pickWrap=document.getElementById("pick"), matchTitle=document.getElementById("matchTitle"), pairList=document.getElementById("pairList");
+  function renderMatch(idx){
+    var a=ANCHORS[idx]; matchTitle.textContent=a.nm;
+    pairList.innerHTML=a.pairs.map(function(p){ return '<div class="pair"><div class="sw" style="background:'+p.c+'"></div><div class="nm">'+p.nm+'</div><div class="ro">'+p.r+'</div></div>'; }).join("");
+    pickWrap.querySelectorAll("button").forEach(function(b,i){ b.classList.toggle("active", i===idx); });
+  }
+  ANCHORS.forEach(function(a,i){
+    var b=document.createElement("button"); b.innerHTML='<span class="sw" style="background:'+a.c+'"></span>'+a.nm;
+    if(i===0) b.classList.add("active");
+    b.addEventListener("click", function(){ renderMatch(i); });
+    pickWrap.appendChild(b);
+  });
+  renderMatch(0);
+
+  /* ===== assistant ===== */
+  var PROMPTS=[
+    {q:"Dress me for today.",a:"Done. For a mild day: navy merino knit, stone chinos, white sneakers, and your silver watch. Easy and clean."},
+    {q:"I need an outfit to meet a client.",a:"Sharp choice: navy blazer over a white Oxford shirt, charcoal trousers, and black derbies. Professional and confident."},
+    {q:"It's 54°F and raining today.",a:"Stay dry: charcoal trench, navy knit, dark indigo jeans, and your waterproof boots."},
+    {q:"Pack me for three days.",a:"Packed: 3 tops, 2 bottoms, 1 overcoat, 2 pairs of shoes — mixing into 6 full outfits from your closet."}
+  ];
+  var chat=document.getElementById("chat"), promptsWrap=document.getElementById("prompts");
+  PROMPTS.forEach(function(p){
+    var b=document.createElement("button"); b.className="prompt"; b.innerHTML="<span>"+p.q+"</span>";
+    b.addEventListener("click", function(){
+      chat.innerHTML='<div class="chat-row"><div class="bubble from-user">'+p.q+'</div></div><div class="chat-row"><div class="bubble from-ai">'+p.a+'</div></div>';
+    });
+    promptsWrap.appendChild(b);
+  });
+
+  /* ===== signup + verification ===== */
+  var tabEmail=document.getElementById("tabEmail"), tabPhone=document.getElementById("tabPhone"),
+      inLabel=document.getElementById("inLabel"), input=document.getElementById("signupInput"),
+      err=document.getElementById("signupErr"), mode="email";
+  function setMode(m){
+    mode=m; tabEmail.classList.toggle("active",m==="email"); tabPhone.classList.toggle("active",m==="phone");
+    if(m==="email"){ inLabel.textContent="Email address"; input.type="email"; input.placeholder="you@example.com"; input.autocomplete="email"; err.textContent="Enter a valid email address."; }
+    else { inLabel.textContent="Phone number"; input.type="tel"; input.placeholder="+1 555 000 1234"; input.autocomplete="tel"; err.textContent="Enter a valid phone number."; }
+    input.value=""; err.classList.remove("show");
+  }
+  tabEmail.addEventListener("click", function(){ setMode("email"); });
+  tabPhone.addEventListener("click", function(){ setMode("phone"); });
+
+  var stepDetails=document.getElementById("stepDetails"), stepVerify=document.getElementById("stepVerify"),
+      stepDone=document.getElementById("stepDone"), dest=document.getElementById("dest"),
+      codeInputs=Array.prototype.slice.call(document.querySelectorAll("#codeBoxes input"));
+  function validEmail(v){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v); }
+  function validPhone(v){ return /^[+]?[\d\s().-]{7,}$/.test(v); }
+
+  document.getElementById("createBtn").addEventListener("click", function(){
+    var v=input.value.trim(); var ok = mode==="email" ? validEmail(v) : validPhone(v);
+    if(!ok){ err.classList.add("show"); input.focus(); return; }
+    err.classList.remove("show"); dest.textContent=v;
+    stepDetails.style.display="none"; stepVerify.classList.add("show");
+    setTimeout(function(){ codeInputs[0].focus(); }, 60);
+  });
+  document.getElementById("backBtn").addEventListener("click", function(){
+    stepVerify.classList.remove("show"); stepDetails.style.display="block";
+    codeInputs.forEach(function(i){ i.value=""; });
+  });
+  document.getElementById("resendBtn").addEventListener("click", function(){
+    codeInputs.forEach(function(i){ i.value=""; }); codeInputs[0].focus();
+  });
+  function checkCode(){
+    if(codeInputs.every(function(i){ return i.value.length===1; })){
+      stepVerify.classList.remove("show"); stepDone.classList.add("show");
+    }
+  }
+  codeInputs.forEach(function(inp,i){
+    inp.addEventListener("input", function(){
+      inp.value=inp.value.replace(/\D/g,"").slice(0,1);
+      if(inp.value && i<codeInputs.length-1) codeInputs[i+1].focus();
+      checkCode();
+    });
+    inp.addEventListener("keydown", function(e){ if(e.key==="Backspace" && !inp.value && i>0) codeInputs[i-1].focus(); });
+    inp.addEventListener("paste", function(e){
+      e.preventDefault();
+      var ds=(e.clipboardData.getData("text")||"").replace(/\D/g,"").slice(0,6).split("");
+      ds.forEach(function(d,k){ if(codeInputs[k]) codeInputs[k].value=d; });
+      (codeInputs[ds.length]||codeInputs[5]).focus(); checkCode();
+    });
+  });
+  document.getElementById("restartBtn").addEventListener("click", function(){
+    stepDone.classList.remove("show"); codeInputs.forEach(function(i){ i.value=""; });
+    setMode("email"); stepDetails.style.display="block";
+  });
+
+  /* ===== weather ===== */
+  var WMO = {
+    0:{label:"Clear sky",emoji:"☀️",group:"clear"},     1:{label:"Mainly clear",emoji:"🌤️",group:"clear"},
+    2:{label:"Partly cloudy",emoji:"⛅",group:"cloudy"}, 3:{label:"Overcast",emoji:"☁️",group:"cloudy"},
+    45:{label:"Fog",emoji:"🌫️",group:"fog"},            48:{label:"Freezing fog",emoji:"🌫️",group:"fog"},
+    51:{label:"Light drizzle",emoji:"🌦️",group:"rain"}, 53:{label:"Drizzle",emoji:"🌦️",group:"rain"},
+    55:{label:"Dense drizzle",emoji:"🌦️",group:"rain"}, 56:{label:"Freezing drizzle",emoji:"🌧️",group:"rain"},
+    57:{label:"Freezing drizzle",emoji:"🌧️",group:"rain"}, 61:{label:"Light rain",emoji:"🌧️",group:"rain"},
+    63:{label:"Rain",emoji:"🌧️",group:"rain"},          65:{label:"Heavy rain",emoji:"🌧️",group:"rain"},
+    66:{label:"Freezing rain",emoji:"🌧️",group:"rain"}, 67:{label:"Freezing rain",emoji:"🌧️",group:"rain"},
+    71:{label:"Light snow",emoji:"🌨️",group:"snow"},    73:{label:"Snow",emoji:"🌨️",group:"snow"},
+    75:{label:"Heavy snow",emoji:"❄️",group:"snow"},     77:{label:"Snow grains",emoji:"🌨️",group:"snow"},
+    80:{label:"Rain showers",emoji:"🌦️",group:"rain"},  81:{label:"Rain showers",emoji:"🌦️",group:"rain"},
+    82:{label:"Violent showers",emoji:"⛈️",group:"rain"}, 85:{label:"Snow showers",emoji:"🌨️",group:"snow"},
+    86:{label:"Snow showers",emoji:"🌨️",group:"snow"},  95:{label:"Thunderstorm",emoji:"⛈️",group:"storm"},
+    96:{label:"Thunderstorm + hail",emoji:"⛈️",group:"storm"}, 99:{label:"Thunderstorm + hail",emoji:"⛈️",group:"storm"}
+  };
+  function wmoInfo(code){ return WMO[code] || {label:"Unknown",emoji:"🌡️",group:"clear"}; }
+  function tempBand(t){
+    if(t>=24) return "hot";
+    if(t>=17) return "warm";
+    if(t>=10) return "mild";
+    if(t>=4)  return "cool";
+    return "cold";
+  }
+
+  var wlocLabel=document.getElementById("wlocLabel"), weatherStatus=document.getElementById("weatherStatus"),
+      weatherNow=document.getElementById("weatherNow"), wTemp=document.getElementById("wTemp"),
+      wCond=document.getElementById("wCond"), wExtra=document.getElementById("wExtra"),
+      weatherOutfit=document.getElementById("weatherOutfit"), weatherPieces=document.getElementById("weatherPieces"),
+      weatherChip=document.getElementById("weatherChip"), wUseGps=document.getElementById("wUseGps"),
+      wCityForm=document.getElementById("wCityForm"), wCityInput=document.getElementById("wCityInput"),
+      wCitySuggest=document.getElementById("wCitySuggest");
+
+  var STORAGE_LOC = "smartwardrobe:loc";
+  function saveLoc(loc){ try{ localStorage.setItem(STORAGE_LOC, JSON.stringify(loc)); }catch(e){} }
+  function loadSavedLoc(){ try{ var s=localStorage.getItem(STORAGE_LOC); return s?JSON.parse(s):null; }catch(e){ return null; } }
+  function setWeatherStatus(t){ weatherStatus.textContent = t; }
+
+  function applyWeather(data, label){
+    var cur = data.current;
+    var info = wmoInfo(cur.weather_code);
+    wTemp.textContent = Math.round(cur.temperature_2m);
+    wCond.textContent = info.emoji + " " + info.label;
+    var bits = [];
+    if(typeof cur.precipitation==="number" && cur.precipitation>0) bits.push(cur.precipitation.toFixed(1)+" mm precip");
+    if(typeof cur.wind_speed_10m==="number") bits.push(Math.round(cur.wind_speed_10m)+" km/h wind");
+    wExtra.textContent = bits.join(" · ");
+    weatherNow.hidden = false;
+    wlocLabel.textContent = label;
+    setWeatherStatus("");
+
+    var band = tempBand(cur.temperature_2m);
+    var rainy = info.group==="rain" || info.group==="storm" || info.group==="snow";
+    var needOuter = band==="cold" || band==="cool" || rainy;
+    if(!hasEnough()) loadSample();
+    var combo = buildOutfit(needOuter);
+    weatherPieces.innerHTML = combo.map(function(x){
+      return '<div class="piece"><div class="swatch" style="'+pieceSwatchStyle(x.item)+'"></div>'+
+             '<div class="nm">'+x.item.name+'</div><div class="ty">'+x.role+'</div></div>';
+    }).join("");
+    var chipText = band==="hot"?"Hot day":band==="warm"?"Warm day":band==="mild"?"Mild day":band==="cool"?"Cool day":"Cold day";
+    if(rainy) chipText += " · " + info.label;
+    weatherChip.textContent = chipText;
+    weatherOutfit.classList.add("show");
+  }
+
+  function fetchWeather(lat, lon, label, locMeta){
+    setWeatherStatus("Loading weather…");
+    wlocLabel.textContent = label;
+    fetch("https://api.open-meteo.com/v1/forecast?latitude="+lat+"&longitude="+lon+"&current=temperature_2m,precipitation,weather_code,wind_speed_10m")
+      .then(function(r){ if(!r.ok) throw new Error("weather request failed"); return r.json(); })
+      .then(function(data){ applyWeather(data, label); if(locMeta) saveLoc(locMeta); })
+      .catch(function(){ setWeatherStatus("Couldn't load the weather right now. Try a city search instead."); });
+  }
+
+  function reverseGeocodeLabel(lat, lon, fallback){
+    fetch("https://api.bigdatacloud.net/data/reverse-geocode-client?latitude="+lat+"&longitude="+lon+"&localityLanguage=en")
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(d){
+        var name = d && (d.city || d.locality);
+        wlocLabel.textContent = name ? name + (d.countryName ? ", "+d.countryName : "") : fallback;
+      })
+      .catch(function(){});
+  }
+
+  function useGps(){
+    if(!navigator.geolocation){ setWeatherStatus("Your browser doesn't support location detection — search a city instead."); return; }
+    setWeatherStatus("Detecting your location…");
+    navigator.geolocation.getCurrentPosition(function(pos){
+      var lat=pos.coords.latitude, lon=pos.coords.longitude;
+      fetchWeather(lat, lon, "Your current location", {mode:"gps"});
+      reverseGeocodeLabel(lat, lon, "Your current location");
+    }, function(){
+      setWeatherStatus("Location access denied — search a city instead.");
+    }, {timeout:10000});
+  }
+
+  function searchCity(query){
+    setWeatherStatus("Searching…");
+    wCitySuggest.hidden = true; wCitySuggest.innerHTML = "";
+    fetch("https://geocoding-api.open-meteo.com/v1/search?name="+encodeURIComponent(query)+"&count=5&language=en&format=json")
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        var results = (d && d.results) || [];
+        if(!results.length){ setWeatherStatus("No matching city found."); return; }
+        setWeatherStatus("");
+        wCitySuggest.hidden = false;
+        results.forEach(function(res){
+          var label = res.name + (res.admin1?", "+res.admin1:"") + (res.country?", "+res.country:"");
+          var b=document.createElement("button"); b.type="button"; b.textContent=label;
+          b.addEventListener("click", function(){
+            wCitySuggest.hidden = true;
+            fetchWeather(res.latitude, res.longitude, label, {mode:"manual", label:label, lat:res.latitude, lon:res.longitude});
+          });
+          wCitySuggest.appendChild(b);
+        });
+      })
+      .catch(function(){ setWeatherStatus("Couldn't search right now — try again in a moment."); });
+  }
+
+  wUseGps.addEventListener("click", useGps);
+  wCityForm.addEventListener("submit", function(e){
+    e.preventDefault();
+    var v = wCityInput.value.trim();
+    if(v) searchCity(v);
+  });
+
+  function initWeather(){
+    var saved = loadSavedLoc();
+    if(saved && saved.mode==="manual" && saved.lat!=null){
+      fetchWeather(saved.lat, saved.lon, saved.label, saved);
+    } else {
+      useGps();
+    }
+  }
+
+  /* ===== init ===== */
+  restoreWardrobe();
+  renderItems(); renderRail(); updateCounts(); refreshGenAvailability();
+  initWeather();
+})();
