@@ -1,475 +1,144 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Smart Wardrobe — Your closet, made intelligent</title>
+<title>Виртуальная примерочная — Smart Wardrobe</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700;12..96,800&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/styles.css">
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<header>
-  <div class="wrap nav">
-    <div class="brand"><span class="brand-mark"></span> Smart Wardrobe</div>
-    <nav class="links">
-      <a href="#weather">Weather</a>
-      <a href="#add">Add clothes</a>
-      <a href="#outfits">Outfits</a>
-      <a href="#tryon">Try-on</a>
-      <a href="#planning">Planning</a>
-      <a href="#account">Account</a>
-    </nav>
-    <a class="btn btn-primary" href="#account">Create account</a>
-  </div>
-</header>
-<hr class="spectrum" />
-
-<section class="hero">
-  <div class="wrap hero-grid">
-    <div>
-      <span class="eyebrow">Your closet, made intelligent</span>
-      <h1>Wear <em>everything</em> you already own.</h1>
-      <p class="lead">Upload photos of your clothes once. Smart Wardrobe sorts them automatically and builds complete outfits from the pieces already hanging in your closet.</p>
-      <div class="hero-cta">
-        <a class="btn btn-primary" href="#add">Add your clothes</a>
-        <button class="btn btn-ghost" id="heroGenerate">Create an outfit</button>
+<!-- ============ FIGURE (single shared node, moved between screens) ============ -->
+<template id="figureTpl">
+  <div class="figure-stage" id="figureStage" data-size="m" data-gender="female">
+    <div class="fig-scale" id="figScale">
+      <img class="fig-photo" id="figPhoto" src="assets/silhouette-female.png" alt="Силуэт фигуры">
+      <div class="fig-accessory slot-hat" id="slotHat"><img alt=""></div>
+      <div class="fig-head" id="figHead">
+        <div class="head-photo empty" id="headPhoto"></div>
+        <button class="head-add" id="headAddBtn" type="button" aria-label="Добавить фото лица" title="Добавить фото лица">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+        <input type="file" id="headFileInput" accept="image/*" hidden>
       </div>
-      <p class="hero-note"><span class="dot"></span> 40–50 pieces. Hundreds of outfits. Nothing new to buy.</p>
-    </div>
-
-    <div class="closet">
-      <div class="closet-top">
-        <span class="t">My wardrobe — sorted by color</span>
-        <span class="c" id="heroCount">0 items</span>
+      <div class="fig-accessory slot-glasses" id="slotGlasses"><img alt=""></div>
+      <div class="fig-accessory slot-watch" id="slotWatch"><img alt=""></div>
+      <div class="fig-torso" id="figTorso"><img class="slot-img" id="slotTop" alt=""></div>
+      <div class="fig-accessory slot-bag side-right" id="slotBag">
+        <img alt="">
+        <div class="bag-flip" id="bagFlip">
+          <button type="button" data-dir="left" aria-label="Сумка слева">‹</button>
+          <button type="button" data-dir="right" aria-label="Сумка справа">›</button>
+        </div>
       </div>
-      <div class="rail" id="rail"></div>
-      <div class="rail-cap"><span>Neutrals</span><span>Warm</span><span>Cool</span></div>
-      <div class="outfit" id="heroOutfit">
-        <div class="outfit-head"><h4>Today's outfit</h4><span class="occ-chip" id="heroOcc">For work</span></div>
-        <div class="pieces" id="heroPieces"></div>
+      <div class="fig-legs" id="figLegs"><img class="slot-img" id="slotBottom" alt=""></div>
+      <div class="fig-feet">
+        <div class="fig-shoe fig-shoe-l" id="slotShoeL"><img alt=""></div>
+        <div class="fig-shoe fig-shoe-r" id="slotShoeR"><img alt=""></div>
       </div>
     </div>
   </div>
-</section>
+</template>
 
-<!-- WEATHER -->
-<section class="section" id="weather">
-  <div class="wrap">
-    <div class="section-head">
-      <span class="eyebrow">Checked automatically</span>
-      <h2>Dressed for today's weather.</h2>
-      <p>Smart Wardrobe checks the weather where you are right now (or anywhere you choose) and pulls a look from your own closet to match it.</p>
-    </div>
+<!-- ============ SCREEN 1 — SETUP ============ -->
+<section class="screen" id="screenSetup">
+  <div class="setup-wrap">
+    <span class="eyebrow">Виртуальная примерочная</span>
+    <h1>Создайте свой силуэт</h1>
+    <p class="lead">Добавьте фото лица и выберите размер фигуры — на следующем шаге наполните примерочную одеждой из своего шкафа.</p>
 
-    <div class="weather-card">
-      <div class="weather-loc">
-        <span class="wloc-label" id="wlocLabel">Detecting your location…</span>
-        <div class="wloc-actions">
-          <button class="btn btn-ghost" id="wUseGps" type="button">Use my location</button>
-          <form class="wcity-form" id="wCityForm">
-            <input type="text" id="wCityInput" placeholder="Or type a city…" aria-label="City" autocomplete="off" />
-            <button class="btn btn-ghost" type="submit">Search</button>
-          </form>
-        </div>
-      </div>
-      <div class="wcity-suggest" id="wCitySuggest" hidden></div>
+    <div class="setup-figure-zone" id="setupFigureSlot"></div>
 
-      <div class="weather-now" id="weatherNow" hidden>
-        <div class="wnow-temp"><span id="wTemp">--</span>°C</div>
-        <div class="wnow-meta">
-          <div class="wnow-cond" id="wCond">—</div>
-          <div class="wnow-extra" id="wExtra"></div>
-        </div>
-      </div>
-      <p class="weather-status" id="weatherStatus">Detecting your location…</p>
-
-      <div class="outfit weather-outfit" id="weatherOutfit">
-        <div class="outfit-head"><h4>Today's pick</h4><span class="occ-chip" id="weatherChip">—</span></div>
-        <div class="pieces" id="weatherPieces"></div>
+    <div class="gender-picker">
+      <span class="sp-label">Пол</span>
+      <div class="gender-chips" id="genderChips">
+        <button type="button" data-gender="female" class="active">Женский</button>
+        <button type="button" data-gender="male">Мужской</button>
       </div>
     </div>
+
+    <div class="size-picker">
+      <span class="sp-label">Размер силуэта</span>
+      <div class="size-chips" id="sizeChips">
+        <button type="button" data-size="s">S</button>
+        <button type="button" data-size="m" class="active">M</button>
+        <button type="button" data-size="l">L</button>
+        <button type="button" data-size="xl">XL</button>
+        <button type="button" data-size="xxl">XXL</button>
+      </div>
+    </div>
+
+    <button class="btn-continue" id="continueBtn" type="button">Продолжить в примерочную →</button>
   </div>
 </section>
 
-<!-- ADD CLOTHES (UPLOAD) -->
-<section class="section" id="add">
-  <div class="wrap">
-    <div class="section-head">
-      <span class="eyebrow">Step 1 — Add your clothes</span>
-      <h2>Upload everything you own.</h2>
-      <p>Add a photo of each piece — clothes, shoes, bags, belts, watches, jewelry, hats, glasses. Smart Wardrobe reads each item and files it into your digital closet.</p>
+<!-- ============ SCREEN 2 — FITTING ROOM ============ -->
+<section class="screen" id="screenFit" hidden>
+  <header class="fit-top">
+    <button class="back-btn" id="backBtn" type="button">← Силуэт и размер</button>
+    <div class="brand"><span class="brand-mark"></span> Примерочная</div>
+  </header>
+
+  <div class="scene" id="scene" data-bg="city-day">
+    <div class="scene-deco" aria-hidden="true">
+      <div class="deco deco-city-day"><span class="sun"></span><span class="bld b1"></span><span class="bld b2"></span><span class="bld b3"></span><span class="bld b4"></span></div>
+      <div class="deco deco-office"><span class="win"></span><span class="blind"></span></div>
+      <div class="deco deco-street"><span class="lamp"></span><span class="road"></span><span class="line"></span></div>
+      <div class="deco deco-restaurant"><span class="bokeh d1"></span><span class="bokeh d2"></span><span class="bokeh d3"></span><span class="bokeh d4"></span><span class="bokeh d5"></span></div>
+      <div class="deco deco-beach"><span class="sun2"></span><span class="wave"></span><span class="cloud c1"></span><span class="cloud c2"></span></div>
     </div>
 
-    <div class="upload-wrap">
-      <div class="dropzone" id="dropzone" role="button" tabindex="0" aria-label="Upload photos of your clothes">
-        <div class="dz-ic"><svg viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3"/></svg></div>
-        <h3>Drop photos here</h3>
-        <p>or browse from your device — add as many as you like</p>
-        <div class="dz-actions">
-          <button class="btn btn-primary" id="browseBtn" type="button">Choose photos</button>
-          <button class="btn btn-ghost" id="sampleBtn" type="button">Load a sample wardrobe</button>
-        </div>
-        <input type="file" id="fileInput" accept="image/*" multiple hidden />
-      </div>
-
-      <div>
-        <div class="closet-bar">
-          <span class="closet-count"><b id="itemCount">0</b> items in your wardrobe</span>
-          <button class="clearbtn" id="clearBtn" hidden>Clear all</button>
-        </div>
-        <div class="grid-items" id="itemGrid"></div>
-        <p class="empty-note" id="emptyNote">Your closet is empty. Add a few photos to start building outfits.</p>
-      </div>
+    <div class="bg-picker" id="bgPicker">
+      <button type="button" data-bg="city-day" class="active">Город днём</button>
+      <button type="button" data-bg="office">Офис</button>
+      <button type="button" data-bg="street">Улица города</button>
+      <button type="button" data-bg="restaurant">Ресторан</button>
+      <button type="button" data-bg="beach">Пляж</button>
     </div>
+
+    <div class="fit-figure-zone" id="fitFigureSlot"></div>
+  </div>
+
+  <div class="wardrobe-panel">
+    <div class="wp-head">
+      <h2>Мой шкаф</h2>
+      <span class="wp-count" id="wpCount">0 вещей</span>
+    </div>
+
+    <div class="wp-tabs" id="wpTabs">
+      <button type="button" data-cat="top" class="active">Верх</button>
+      <button type="button" data-cat="bottom">Низ</button>
+      <button type="button" data-cat="shoes">Обувь</button>
+      <button type="button" data-cat="accessories">Аксессуары</button>
+    </div>
+
+    <div class="acc-filter" id="accFilterBar" hidden>
+      <button type="button" data-sub="all">Все</button>
+      <button type="button" data-sub="bag" class="active">Сумки</button>
+      <button type="button" data-sub="glasses">Очки</button>
+      <button type="button" data-sub="hat">Шляпы</button>
+      <button type="button" data-sub="watch">Часы</button>
+    </div>
+
+    <p class="wp-hint">Совет: фотографируйте вещи на однотонном фоне — так ИИ точнее выровняет и обрежет силуэт.</p>
+
+    <div class="wp-grid" id="wpGrid"></div>
+    <p class="wp-empty" id="wpEmptyHint" hidden>В этой категории пока пусто — добавьте фото.</p>
+    <input type="file" id="itemFileInput" accept="image/*" multiple hidden>
   </div>
 </section>
 
-<!-- HOW IT WORKS -->
-<section class="section" id="how">
-  <div class="wrap">
-    <div class="section-head">
-      <span class="eyebrow">What the AI does</span>
-      <h2>Each photo, read and filed.</h2>
-      <p>You never type a single field. Smart Wardrobe identifies the details and organizes the piece for you.</p>
-    </div>
-    <div class="steps">
-      <div class="step">
-        <span class="num">01 / Photograph</span>
-        <h3>Snap what you own</h3>
-        <p>One photo per piece is enough to add it to your wardrobe — from a white shirt to your favorite watch.</p>
-      </div>
-      <div class="step">
-        <span class="num">02 / Recognize</span>
-        <h3>The AI reads each item</h3>
-        <p>It detects the details automatically:</p>
-        <div class="tag">
-          <span class="stamp">Detected</span>
-          <div class="row"><span class="k">Type</span><span class="v">Oxford shirt</span></div>
-          <div class="row"><span class="k">Color</span><span class="v">White</span></div>
-          <div class="row"><span class="k">Material</span><span class="v">Cotton</span></div>
-          <div class="row"><span class="k">Cut</span><span class="v">Slim</span></div>
-          <div class="row"><span class="k">Season</span><span class="v">All-season</span></div>
-          <div class="row"><span class="k">Condition</span><span class="v">Excellent</span></div>
-        </div>
-      </div>
-      <div class="step">
-        <span class="num">03 / Organize</span>
-        <h3>Your wardrobe builds itself</h3>
-        <p>Every piece lands in a digital closet — grouped and filterable by color, season, style, brand, or occasion.</p>
-        <div class="pill-list"><span>Color</span><span>Season</span><span>Style</span><span>Brand</span><span>Occasion</span></div>
-      </div>
-    </div>
+<!-- ============ AI PROCESSING OVERLAY ============ -->
+<div class="ai-overlay" id="aiOverlay" hidden>
+  <div class="ai-box">
+    <div class="ai-spinner"></div>
+    <p id="aiStatus">ИИ обрабатывает фото…</p>
   </div>
-</section>
+</div>
 
-<!-- OUTFIT GENERATOR -->
-<section class="section" id="outfits">
-  <div class="wrap">
-    <div class="gen">
-      <div class="section-head">
-        <span class="eyebrow" style="color:#B6ACF7">Step 2 — Generate outfits</span>
-        <h2>One button. A full look.</h2>
-        <p>Pick an occasion and Smart Wardrobe assembles a complete outfit from your own pieces. Don't love it? Generate another.</p>
-      </div>
-      <div class="occasions" id="occasions"></div>
-      <div class="gen-stage">
-        <div class="gen-empty" id="genEmpty">
-          <span class="eyebrow" style="color:rgba(255,255,255,.5)">Ready when you are</span>
-          <div id="genEmptyMsg">Add a few clothes above, then create your look.</div>
-        </div>
-        <div class="gen-grid" id="genGrid" style="display:none"></div>
-      </div>
-      <div class="gen-actions">
-        <button class="btn btn-light" id="genBtn">Create an outfit</button>
-        <button class="btn btn-line" id="genAgain" style="display:none">Try another</button>
-        <span class="why" id="genWhy"></span>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- MATCH ONE ITEM -->
-<section class="section" id="match">
-  <div class="wrap match">
-    <div>
-      <span class="eyebrow">Build around one piece</span>
-      <h2 style="font-size:clamp(28px,4vw,42px);margin-top:14px;">Start with what you love.</h2>
-      <p style="color:var(--ink-soft);margin-top:16px;font-size:17px;">Tap any piece and Smart Wardrobe shows what pairs with it best — pulled only from clothes you already have.</p>
-      <div class="pick" id="pick" style="margin-top:24px"></div>
-    </div>
-    <div class="match-out">
-      <span class="lbl">Pairs well with</span>
-      <h3 id="matchTitle">White Oxford shirt</h3>
-      <div class="pair-list" id="pairList"></div>
-    </div>
-  </div>
-</section>
-
-<!-- TRY-ON / AVATAR -->
-<section class="section" id="tryon">
-  <div class="wrap">
-    <div class="section-head">
-      <span class="eyebrow">See it on you</span>
-      <h2>Try it on your own silhouette.</h2>
-      <p>Build a simple figure that matches your height and build, swap in your own face, and preview outfits from your closet up close or from across the room.</p>
-    </div>
-
-    <div class="tryon-grid">
-      <div class="tryon-controls">
-        <div class="ctl-group">
-          <label class="ctl-label" for="avHeight">Height — <span id="avHeightVal">175</span> cm</label>
-          <input type="range" id="avHeight" min="150" max="200" value="175" />
-        </div>
-
-        <div class="ctl-group">
-          <span class="ctl-label">Build</span>
-          <div class="seg" id="avBuildSeg">
-            <button type="button" data-build="slim">Slim</button>
-            <button type="button" data-build="regular" class="active">Regular</button>
-            <button type="button" data-build="athletic">Athletic</button>
-            <button type="button" data-build="broad">Broad</button>
-          </div>
-        </div>
-
-        <div class="ctl-group">
-          <span class="ctl-label">Your face</span>
-          <div class="face-upload">
-            <button class="btn btn-ghost" id="avFaceBtn" type="button">Upload a photo</button>
-            <button class="btn btn-ghost" id="avFaceClear" type="button" hidden>Remove</button>
-            <input type="file" id="avFaceInput" accept="image/*" hidden />
-          </div>
-        </div>
-
-        <div class="ctl-group">
-          <span class="ctl-label">Outfit pieces</span>
-          <div class="tryon-picks" id="tryonPicks"></div>
-        </div>
-
-        <div class="ctl-group">
-          <span class="ctl-label">Background</span>
-          <div class="bg-swatches" id="bgSwatches">
-            <button type="button" data-bg="studio" class="active">Studio</button>
-            <button type="button" data-bg="work">Work</button>
-            <button type="button" data-bg="street">Street</button>
-            <button type="button" data-bg="beach">Beach</button>
-            <button type="button" data-bg="city">City</button>
-          </div>
-        </div>
-
-        <div class="ctl-group">
-          <span class="ctl-label">Your measurements (cm)</span>
-          <div class="measure-grid">
-            <label>Height<input type="number" id="mHeight" min="100" max="230" inputmode="numeric" /></label>
-            <label>Chest<input type="number" id="mChest" min="50" max="170" inputmode="numeric" /></label>
-            <label>Waist<input type="number" id="mWaist" min="40" max="170" inputmode="numeric" /></label>
-            <label>Hips<input type="number" id="mHips" min="50" max="170" inputmode="numeric" /></label>
-          </div>
-        </div>
-      </div>
-
-      <div class="tryon-stage" id="tryonStage">
-        <div class="zoom-toggle" role="group" aria-label="Zoom">
-          <button type="button" id="zoomClose" data-zoom="close">Close-up</button>
-          <button type="button" id="zoomFar" class="active" data-zoom="far">Full view</button>
-        </div>
-        <div class="figure-wrap" id="figureWrap">
-          <div class="figure" id="figure">
-            <div class="fig-head" id="figHead"></div>
-            <div class="fig-torso-wrap">
-              <div class="fig-torso" id="figTorso"></div>
-              <div class="fig-outer" id="figOuter" hidden></div>
-            </div>
-            <div class="fig-legs" id="figLegs"></div>
-            <div class="fig-shoes">
-              <div class="fig-shoe" id="figShoeL"></div>
-              <div class="fig-shoe" id="figShoeR"></div>
-            </div>
-          </div>
-        </div>
-        <p class="tryon-empty" id="tryonEmpty">Add a few clothes first, then pick pieces to try on.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- PLANNING -->
-<section class="section" id="planning">
-  <div class="wrap">
-    <div class="section-head"><span class="eyebrow">Save, plan, repeat less</span><h2>Outfits that stay organized.</h2></div>
-    <div class="feat">
-      <div class="fcard">
-        <h3><span class="ficon"><svg viewBox="0 0 24 24"><path d="M5 3v18l7-5 7 5V3z"/></svg></span>Save favorites</h3>
-        <p>Keep the looks you love in collections you name yourself, and grow a personal library of ready-to-wear outfits.</p>
-        <div class="pill-list"><span>Favorites</span><span>Work</span><span>Summer</span><span>Travel</span><span>Evening</span></div>
-      </div>
-      <div class="fcard">
-        <h3><span class="ficon"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 9h18M8 3v4M16 3v4"/></svg></span>Plan ahead</h3>
-        <p>Choose outfits for tomorrow, the week, a holiday, or a work trip. Everything you set appears on a calendar.</p>
-        <div class="pill-list"><span>Tomorrow</span><span>This week</span><span>Vacation</span><span>Business trip</span></div>
-      </div>
-      <div class="fcard">
-        <h3><span class="ficon"><svg viewBox="0 0 24 24"><path d="M12 8v4l3 2"/><circle cx="12" cy="12" r="9"/></svg></span>Wear history</h3>
-        <p>Smart Wardrobe remembers what you've worn, so it won't repeat a look too soon — and surfaces your best combinations.</p>
-        <div class="pill-list"><span>Avoid repeats</span><span>Best looks</span><span>Most worn</span></div>
-      </div>
-    </div>
-
-    <div class="tryon-grid plan-app">
-      <div class="tryon-controls plan-form-card">
-        <h3>Add a plan</h3>
-        <form id="planForm">
-          <div class="ctl-group">
-            <label class="ctl-label" for="planName">Event name</label>
-            <input type="text" id="planName" placeholder="Beach weekend" required />
-          </div>
-          <div class="ctl-group">
-            <label class="ctl-label" for="planDate">Date</label>
-            <input type="date" id="planDate" required />
-          </div>
-          <div class="ctl-group">
-            <span class="ctl-label">Location</span>
-            <div class="seg" id="planLocSeg">
-              <button type="button" data-loc="current" class="active">Current location</button>
-              <button type="button" data-loc="destination">A destination</button>
-            </div>
-          </div>
-          <div class="ctl-group plan-dest" id="planDestWrap" hidden>
-            <span class="ctl-label">Destination</span>
-            <div class="wcity-form">
-              <input type="text" id="planDestInput" placeholder="Search a city…" aria-label="Destination city" autocomplete="off" />
-              <button class="btn btn-ghost" type="button" id="planDestSearchBtn">Search</button>
-            </div>
-            <div class="wcity-suggest" id="planDestSuggest" hidden></div>
-            <p class="plan-dest-picked" id="planDestPicked"></p>
-          </div>
-          <button class="btn btn-primary" type="submit">Add plan</button>
-          <p class="plan-form-status" id="planFormStatus"></p>
-        </form>
-      </div>
-      <div class="plan-list" id="planList">
-        <p class="plan-empty" id="planEmpty">No plans yet — add a date above and Smart Wardrobe will line up the forecast and an outfit once it's close enough to call.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ASSISTANT -->
-<section class="section">
-  <div class="wrap assist">
-    <div>
-      <span class="eyebrow">Personal assistant</span>
-      <h2 style="font-size:clamp(28px,4vw,44px);margin-top:14px;">Just ask. Get dressed.</h2>
-      <p style="color:var(--ink-soft);margin:16px 0 8px;font-size:17px;">Tell Smart Wardrobe what your day looks like and it answers with a complete outfit from your closet. Try one:</p>
-      <div class="prompts" id="prompts"></div>
-    </div>
-    <div class="chat" id="chat">
-      <div class="chat-row"><div class="bubble from-user">It's 54°F and raining today.</div></div>
-      <div class="chat-row"><div class="bubble from-ai">Here's a dry, put-together look from your wardrobe: charcoal trench, navy knit, dark jeans, and your waterproof Chelsea boots. Want a lighter alternative?</div></div>
-    </div>
-  </div>
-</section>
-
-<!-- STAT -->
-<section class="section">
-  <div class="wrap">
-    <div class="stat">
-      <div class="big">100s<small>outfits unlocked</small></div>
-      <p>From just 40–50 pieces, Smart Wardrobe keeps finding fresh combinations of clothes you already own — so you look new without buying new.</p>
-    </div>
-  </div>
-</section>
-
-<!-- ACCOUNT -->
-<section class="section" id="account">
-  <div class="wrap acct">
-    <div>
-      <span class="eyebrow">Your account, secured</span>
-      <h2 style="font-size:clamp(30px,4.4vw,48px);margin-top:14px;">One wardrobe. Yours alone.</h2>
-      <p style="color:var(--ink-soft);margin-top:16px;font-size:18px;max-width:30em;">Every person gets a private account, verified by email or phone, so your closet, outfits, and history stay yours across every device.</p>
-      <div class="acct-points">
-        <div class="ap"><span class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg></span><div><h3>Sign up by email or phone</h3><p>Create an account in seconds, or continue with Google or Apple.</p></div></div>
-        <div class="ap"><span class="ic"><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span><div><h3>Verify it's you</h3><p>Confirm with a link sent to your email or a 6-digit code by SMS.</p></div></div>
-        <div class="ap"><span class="ic"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></svg></span><div><h3>Private by default</h3><p>Your wardrobe photos are encrypted, visible only to you, and you can delete everything anytime.</p></div></div>
-        <div class="ap"><span class="ic"><svg viewBox="0 0 24 24"><path d="M4 7h11M4 12h16M4 17h9"/><circle cx="19" cy="7" r="2"/><circle cx="14" cy="17" r="2"/></svg></span><div><h3>Synced everywhere</h3><p>Your closet lives in your account, not on one device — open it on phone, tablet, or web.</p></div></div>
-      </div>
-    </div>
-
-    <div class="signup">
-      <div id="stepDetails">
-        <h3>Create your account</h3>
-        <p class="sub">Start your digital wardrobe in under a minute.</p>
-        <div class="tabs"><button class="active" id="tabEmail">Email</button><button id="tabPhone">Phone</button></div>
-        <div class="field">
-          <label id="inLabel" for="signupInput">Email address</label>
-          <input id="signupInput" type="email" placeholder="you@example.com" autocomplete="email" />
-          <div class="err" id="signupErr">Enter a valid email address.</div>
-        </div>
-        <button class="btn btn-primary" id="createBtn">Create account</button>
-        <p class="fineprint">By continuing you agree to the Terms and Privacy Policy.</p>
-      </div>
-
-      <div class="verify" id="stepVerify">
-        <button class="back" id="backBtn">← Back</button>
-        <h3>Enter your code</h3>
-        <p class="sub">We sent a 6-digit code to <span class="dest" id="dest">you@example.com</span>.</p>
-        <div class="code" id="codeBoxes">
-          <input maxlength="1" inputmode="numeric" aria-label="Digit 1" />
-          <input maxlength="1" inputmode="numeric" aria-label="Digit 2" />
-          <input maxlength="1" inputmode="numeric" aria-label="Digit 3" />
-          <input maxlength="1" inputmode="numeric" aria-label="Digit 4" />
-          <input maxlength="1" inputmode="numeric" aria-label="Digit 5" />
-          <input maxlength="1" inputmode="numeric" aria-label="Digit 6" />
-        </div>
-        <p class="resend">Didn't get it? <button id="resendBtn">Resend code</button></p>
-        <p class="hint">Demo: type any 6 digits to verify.</p>
-      </div>
-
-      <div class="done" id="stepDone">
-        <div class="check"><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></div>
-        <h3>You're verified</h3>
-        <p>Your wardrobe is ready. Add your first piece to begin.</p>
-        <button class="btn btn-dark" style="margin-top:20px" id="restartBtn">Start over</button>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section class="section" style="padding-top:0">
-  <div class="wrap">
-    <div class="final">
-      <span class="eyebrow" style="color:#B6ACF7">Open your wardrobe</span>
-      <h2>Get dressed in seconds.</h2>
-      <p>Photograph your closet once. Then let Smart Wardrobe do the choosing — every single morning.</p>
-      <div class="final-form">
-        <input type="text" placeholder="Email or phone number" aria-label="Email or phone number" />
-        <a class="btn btn-light" href="#account">Create account</a>
-      </div>
-      <hr class="spectrum" />
-    </div>
-  </div>
-</section>
-
-<footer>
-  <div class="wrap">
-    <div class="foot">
-      <div style="max-width:18rem">
-        <div class="brand" style="margin-bottom:12px"><span class="brand-mark"></span> Smart Wardrobe</div>
-        <p style="color:var(--ink-soft);font-size:14.5px">The intelligent closet that helps you wear everything you already own.</p>
-      </div>
-      <div class="col"><h5>Product</h5><a href="#add">Add clothes</a><a href="#outfits">Outfit generator</a><a href="#planning">Planning</a><a href="#account">Account</a></div>
-      <div class="col"><h5>Wardrobe</h5><a href="#match">Build around a piece</a><a href="#tryon">Try it on</a><a href="#outfits">Occasions</a><a href="#planning">Wear history</a></div>
-      <div class="col"><h5>Company</h5><a href="#">About</a><a href="#">Privacy</a><a href="#">Terms</a><a href="#">Support</a></div>
-    </div>
-    <div class="foot-bottom">
-      <span>© 2026 Smart Wardrobe. All rights reserved.</span>
-      <span class="mono">Made for the clothes you already love.</span>
-    </div>
-  </div>
-</footer>
-
-<script src="js/app.js"></script>
+<script src="app.js"></script>
 </body>
 </html>
