@@ -155,106 +155,102 @@
     return { minX, minY, maxX, maxY };
   }
 
-  // Principal axis angle (degrees, in (-90,90]) of the opaque pixel cloud via image moments.
-  function principalAngleDeg(imgData, w, h, box) {
+  // Removes small disconnected speckles left over from background removal
+  // (stray pixels that matched neither a background cluster nor a neighbor
+  // closely enough) so the cutout edge doesn't look torn/jagged. Keeps every
+  // opaque region above a tiny size floor - real garment parts (a collar, a
+  // dangling sleeve, a strap) are always far bigger than a noise speck.
+  function despeckle(imgData, w, h, minArea = 24) {
     const d = imgData.data;
-    const step = 2;
-    let n = 0, sx = 0, sy = 0;
-    for (let y = box.minY; y <= box.maxY; y += step) {
-      for (let x = box.minX; x <= box.maxX; x += step) {
-        if (d[(y * w + x) * 4 + 3] > 10) { sx += x; sy += y; n++; }
-      }
-    }
-    if (!n) return 0;
-    const cx = sx / n, cy = sy / n;
-    let sxx = 0, syy = 0, sxy = 0;
-    for (let y = box.minY; y <= box.maxY; y += step) {
-      for (let x = box.minX; x <= box.maxX; x += step) {
-        if (d[(y * w + x) * 4 + 3] > 10) {
-          const dx = x - cx, dy = y - cy;
-          sxx += dx * dx; syy += dy * dy; sxy += dx * dy;
+    const n = w * h;
+    const visited = new Uint8Array(n);
+    const stack = new Int32Array(n);
+    const isOpaque = (idx) => d[idx * 4 + 3] > 10;
+
+    for (let start = 0; start < n; start++) {
+      if (visited[start] || !isOpaque(start)) continue;
+      let sp = 0;
+      stack[sp++] = start;
+      visited[start] = 1;
+      const region = [start];
+      while (sp > 0) {
+        const idx = stack[--sp];
+        const x = idx % w, y = (idx - x) / w;
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            if (!dx && !dy) continue;
+            const nx = x + dx, ny = y + dy;
+            if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+            const nIdx = ny * w + nx;
+            if (visited[nIdx] || !isOpaque(nIdx)) continue;
+            visited[nIdx] = 1;
+            stack[sp++] = nIdx;
+            region.push(nIdx);
+          }
         }
       }
+      if (region.length < minArea) {
+        for (const idx of region) d[idx * 4 + 3] = 0;
+      }
     }
-    return 0.5 * Math.atan2(2 * sxy, sxx - syy) * 180 / Math.PI;
+    return imgData;
   }
 
-  function angleDiffToTarget(theta, target) {
-    let diff = target - theta;
-    while (diff > 90) diff -= 180;
-    while (diff < -90) diff += 180;
-    return diff;
+  // Softens the hard binary cutout edge with a light blur on the alpha
+  // channel only (color stays crisp) so the silhouette boundary doesn't look
+  // jagged once it's scaled up to fit the figure.
+  function featherAlpha(imgData, w, h, radius = 1) {
+    const d = imgData.data;
+    const srcA = new Uint8ClampedArray(w * h);
+    for (let i = 0; i < w * h; i++) srcA[i] = d[i * 4 + 3];
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        let sum = 0, count = 0;
+        for (let dy = -radius; dy <= radius; dy++) {
+          const ny = y + dy;
+          if (ny < 0 || ny >= h) continue;
+          for (let dx = -radius; dx <= radius; dx++) {
+            const nx = x + dx;
+            if (nx < 0 || nx >= w) continue;
+            sum += srcA[ny * w + nx];
+            count++;
+          }
+        }
+        d[(y * w + x) * 4 + 3] = Math.round(sum / count);
+      }
+    }
+    return imgData;
   }
 
-  function rotateCanvas(srcCanvas, angleDeg, w, h) {
-    const rad = (angleDeg * Math.PI) / 180;
-    const diag = Math.ceil(Math.sqrt(w * w + h * h));
-    const c = document.createElement('canvas');
-    c.width = diag; c.height = diag;
-    const ctx = c.getContext('2d');
-    ctx.translate(diag / 2, diag / 2);
-    ctx.rotate(rad);
-    ctx.drawImage(srcCanvas, -w / 2, -h / 2, w, h);
-    return c;
-  }
-
-  // Full "AI" pipeline: remove background, straighten ("iron flat"), crop to contour.
+  // Full "AI" pipeline: remove background, clean up the cutout, crop to
+  // contour. No auto-rotation: a real garment's silhouette (sleeves, collar,
+  // folds) is too asymmetric for a whole-shape tilt estimate to be reliable -
+  // it was as likely to rotate a perfectly upright photo into a diagonal mess
+  // as to fix a genuinely tilted one. Cropping tight to the actual cutout and
+  // anchoring it on the body (done in applyDynamicFit/CSS) is what makes it
+  // look "worn"; almost every flat-lay/hanger/product photo is upright enough
+  // already for that alone to look organic.
   async function processGarment(file, category, onStatus) {
     const dataUrl = await fileToDataURL(file);
     const img = await loadImage(dataUrl);
 
     const MAX_DIM = 640;
     const scale = Math.min(1, MAX_DIM / Math.max(img.width, img.height));
-    let w = Math.round(img.width * scale), h = Math.round(img.height * scale);
+    const w = Math.round(img.width * scale), h = Math.round(img.height * scale);
 
-    let canvas = document.createElement('canvas');
+    const canvas = document.createElement('canvas');
     canvas.width = w; canvas.height = h;
-    let ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d');
     ctx.drawImage(img, 0, 0, w, h);
 
     onStatus && onStatus('Removing background…');
     await tick();
     let imgData = removeBackground(ctx, w, h);
+    despeckle(imgData, w, h);
+    featherAlpha(imgData, w, h);
     ctx.putImageData(imgData, 0, 0);
 
-    let box = bbox(imgData, w, h) || { minX: 0, minY: 0, maxX: w - 1, maxY: h - 1 };
-
-    onStatus && onStatus('Straightening item…');
-    await tick();
-
-    if (category === 'top' || category === 'bottom' || category === 'shoes') {
-      const target = category === 'shoes' ? 0 : 90;
-      const theta = principalAngleDeg(imgData, w, h, box);
-      const rawDiff = angleDiffToTarget(theta, target);
-      // Only correct a slight photography tilt. A large mismatch usually means
-      // the garment is naturally wider/squarer than tall (a boxy crop top, an
-      // open blazer), not tilted - rotating it would distort the shape instead
-      // of straightening it.
-      const diff = Math.abs(rawDiff) <= 25 ? rawDiff : 0;
-
-      if (Math.abs(diff) > 1.5) {
-        let rotated = rotateCanvas(canvas, diff, w, h);
-        let rCtx = rotated.getContext('2d');
-        let rData = rCtx.getImageData(0, 0, rotated.width, rotated.height);
-        let rBox = bbox(rData, rotated.width, rotated.height);
-
-        if (rBox) {
-          const newTheta = principalAngleDeg(rData, rotated.width, rotated.height, rBox);
-          const newDiff = Math.abs(angleDiffToTarget(newTheta, target));
-          if (newDiff > Math.abs(diff) + 1) {
-            // sign convention was backwards for this case - flip and redo
-            rotated = rotateCanvas(canvas, -diff, w, h);
-            rCtx = rotated.getContext('2d');
-            rData = rCtx.getImageData(0, 0, rotated.width, rotated.height);
-            rBox = bbox(rData, rotated.width, rotated.height) || rBox;
-          }
-        }
-
-        canvas = rotated; ctx = rCtx; w = canvas.width; h = canvas.height;
-        imgData = rData;
-        box = rBox || { minX: 0, minY: 0, maxX: w - 1, maxY: h - 1 };
-      }
-    }
+    const box = bbox(imgData, w, h) || { minX: 0, minY: 0, maxX: w - 1, maxY: h - 1 };
 
     onStatus && onStatus('Cropping to outline…');
     await tick();
@@ -292,6 +288,8 @@
     onStatus && onStatus('Removing background…');
     await tick();
     const imgData = removeBackground(ctx, w, h);
+    despeckle(imgData, w, h);
+    featherAlpha(imgData, w, h);
     ctx.putImageData(imgData, 0, 0);
 
     onStatus && onStatus('Cropping to outline…');
