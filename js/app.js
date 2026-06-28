@@ -194,12 +194,12 @@
           processGarmentImage(img, function(dataUrl, color, cutout){
             var item = { id: nextId++, url: dataUrl, color: color, category: "top", name: "Wardrobe piece", silhouette: "g-top", cutout: !!cutout };
             wardrobe.push(item);
-            renderItems(); renderRail(); updateCounts(); refreshGenAvailability(); persistWardrobe();
+            renderItems(); renderRail(); updateCounts(); refreshGenAvailability(); refreshTryonAvailability(); persistWardrobe();
           });
         };
         img.onerror = function(){
           var item = {id:nextId++, url:null, color:"#C9C6D2", category:"top", name:"Wardrobe piece", silhouette:"g-top", cutout:false};
-          wardrobe.push(item); renderItems(); renderRail(); updateCounts(); refreshGenAvailability(); persistWardrobe();
+          wardrobe.push(item); renderItems(); renderRail(); updateCounts(); refreshGenAvailability(); refreshTryonAvailability(); persistWardrobe();
         };
         img.src = reader.result;
       };
@@ -226,7 +226,7 @@
     sample.forEach(function(s){
       wardrobe.push({id:nextId++, url:null, color:s.color, category:s.category, name:s.name, silhouette:catSil(s.category)});
     });
-    renderItems(); renderRail(); updateCounts(); refreshGenAvailability(); persistWardrobe();
+    renderItems(); renderRail(); updateCounts(); refreshGenAvailability(); refreshTryonAvailability(); persistWardrobe();
   }
 
   /* ===== render item grid ===== */
@@ -251,7 +251,7 @@
       rm.className = "rm"; rm.type="button"; rm.setAttribute("aria-label","Remove item"); rm.textContent="×";
       rm.addEventListener("click", function(){
         wardrobe = wardrobe.filter(function(x){ return x.id!==it.id; });
-        renderItems(); renderRail(); updateCounts(); refreshGenAvailability(); persistWardrobe();
+        renderItems(); renderRail(); updateCounts(); refreshGenAvailability(); refreshTryonAvailability(); persistWardrobe();
       });
       ph.appendChild(rm);
       var meta = document.createElement("div");
@@ -266,9 +266,19 @@
       });
       sel.addEventListener("change", function(){
         it.category = sel.value; it.silhouette = catSil(sel.value);
-        renderRail(); refreshGenAvailability(); persistWardrobe();
+        renderRail(); refreshGenAvailability(); refreshTryonAvailability(); persistWardrobe();
       });
       meta.appendChild(sel);
+      var measRow = document.createElement("div");
+      measRow.className = "meas-row";
+      var wIn = document.createElement("input");
+      wIn.type="number"; wIn.min="0"; wIn.placeholder="Width cm"; wIn.setAttribute("aria-label","Garment width in cm"); wIn.value = it.measureW || "";
+      var lIn = document.createElement("input");
+      lIn.type="number"; lIn.min="0"; lIn.placeholder="Length cm"; lIn.setAttribute("aria-label","Garment length in cm"); lIn.value = it.measureL || "";
+      wIn.addEventListener("change", function(){ it.measureW = wIn.value; persistWardrobe(); });
+      lIn.addEventListener("change", function(){ it.measureL = lIn.value; persistWardrobe(); });
+      measRow.appendChild(wIn); measRow.appendChild(lIn);
+      meta.appendChild(measRow);
       card.appendChild(ph); card.appendChild(meta);
       itemGrid.appendChild(card);
     });
@@ -319,7 +329,7 @@
   ["dragleave","drop"].forEach(function(ev){ dropzone.addEventListener(ev,function(e){ e.preventDefault(); dropzone.classList.remove("drag"); }); });
   dropzone.addEventListener("drop", function(e){ if(e.dataTransfer && e.dataTransfer.files) addFiles(e.dataTransfer.files); });
   clearBtn.addEventListener("click", function(){
-    wardrobe = []; renderItems(); renderRail(); updateCounts(); refreshGenAvailability(); persistWardrobe();
+    wardrobe = []; renderItems(); renderRail(); updateCounts(); refreshGenAvailability(); refreshTryonAvailability(); persistWardrobe();
   });
 
   /* ===== shared outfit builder ===== */
@@ -632,8 +642,224 @@
     }
   }
 
+  /* ===== avatar / try-on ===== */
+  var STORAGE_AVATAR = "smartwardrobe:avatar";
+  var avatarState = {
+    height: 175, build: "regular", face: null, zoom: "far", bg: "studio",
+    picks: { top: null, outer: null, bottom: null, shoe: null },
+    measurements: { height: "", chest: "", waist: "", hips: "" }
+  };
+
+  function mergeAvatar(saved){
+    if(!saved || typeof saved !== "object") return;
+    if(typeof saved.height === "number") avatarState.height = saved.height;
+    if(typeof saved.build === "string") avatarState.build = saved.build;
+    if(typeof saved.face === "string" || saved.face === null) avatarState.face = saved.face;
+    if(typeof saved.zoom === "string") avatarState.zoom = saved.zoom;
+    if(typeof saved.bg === "string") avatarState.bg = saved.bg;
+    if(saved.picks){
+      ["top","outer","bottom","shoe"].forEach(function(k){
+        if(saved.picks[k]!==undefined) avatarState.picks[k] = saved.picks[k];
+      });
+    }
+    if(saved.measurements){
+      ["height","chest","waist","hips"].forEach(function(k){
+        if(saved.measurements[k]!==undefined) avatarState.measurements[k] = saved.measurements[k];
+      });
+    }
+  }
+  function saveAvatar(){
+    try{ localStorage.setItem(STORAGE_AVATAR, JSON.stringify(avatarState)); }catch(e){}
+  }
+  function loadAvatar(){
+    try{
+      var raw = localStorage.getItem(STORAGE_AVATAR);
+      if(raw) mergeAvatar(JSON.parse(raw));
+    }catch(e){}
+  }
+
+  var avHeight=document.getElementById("avHeight"), avHeightVal=document.getElementById("avHeightVal"),
+      avBuildSeg=document.getElementById("avBuildSeg"),
+      avFaceBtn=document.getElementById("avFaceBtn"), avFaceClear=document.getElementById("avFaceClear"), avFaceInput=document.getElementById("avFaceInput"),
+      tryonPicks=document.getElementById("tryonPicks"), bgSwatches=document.getElementById("bgSwatches"),
+      tryonStage=document.getElementById("tryonStage"), zoomClose=document.getElementById("zoomClose"), zoomFar=document.getElementById("zoomFar"),
+      figure=document.getElementById("figure"), figHead=document.getElementById("figHead"),
+      figTorso=document.getElementById("figTorso"), figOuter=document.getElementById("figOuter"), figLegs=document.getElementById("figLegs"),
+      figShoeL=document.getElementById("figShoeL"), figShoeR=document.getElementById("figShoeR"), tryonEmpty=document.getElementById("tryonEmpty"),
+      mHeight=document.getElementById("mHeight"), mChest=document.getElementById("mChest"), mWaist=document.getElementById("mWaist"), mHips=document.getElementById("mHips");
+
+  var TRYON_CATS = [
+    {key:"top",    label:"Top"},
+    {key:"outer",  label:"Outerwear"},
+    {key:"bottom", label:"Bottom"},
+    {key:"shoe",   label:"Shoes"}
+  ];
+
+  function findItemById(id){
+    for(var i=0;i<wardrobe.length;i++){ if(wardrobe[i].id===id) return wardrobe[i]; }
+    return null;
+  }
+  function avatarBuildScale(b){
+    return {slim:0.86, regular:1, athletic:1.1, broad:1.24}[b] || 1;
+  }
+  function applyZoneLook(zoneEl, item, neutralColor){
+    if(item && item.url){
+      zoneEl.style.backgroundColor = "transparent";
+      zoneEl.style.backgroundImage = "url('"+item.url+"')";
+      zoneEl.style.backgroundSize = item.cutout ? "contain" : "cover";
+    } else if(item){
+      zoneEl.style.backgroundImage = "none";
+      zoneEl.style.backgroundColor = item.color;
+    } else {
+      zoneEl.style.backgroundImage = "none";
+      zoneEl.style.backgroundColor = neutralColor;
+    }
+  }
+  function applyFigureMetrics(){
+    var hCm = Math.max(150, Math.min(200, parseInt(avatarState.height,10) || 175));
+    var fh = 220 + (hCm-150)/50*110;
+    var bs = avatarBuildScale(avatarState.build);
+    figure.style.setProperty("--fig-h", fh.toFixed(0)+"px");
+    figure.style.setProperty("--head-d", Math.round(fh*0.16)+"px");
+    figure.style.setProperty("--torso-w", Math.round(fh*0.42*bs)+"px");
+    figure.style.setProperty("--torso-h", Math.round(fh*0.32)+"px");
+    figure.style.setProperty("--legs-w", Math.round(fh*0.38*bs)+"px");
+    figure.style.setProperty("--legs-h", Math.round(fh*0.40)+"px");
+    figure.style.setProperty("--shoe-w", Math.round(fh*0.15*bs)+"px");
+  }
+
+  function renderFigure(){
+    applyFigureMetrics();
+
+    if(avatarState.face){ figHead.style.backgroundImage = "url('"+avatarState.face+"')"; figHead.style.backgroundSize = "cover"; }
+    else { figHead.style.backgroundImage = "none"; figHead.style.backgroundColor = "#E3C49C"; }
+
+    applyZoneLook(figTorso, findItemById(avatarState.picks.top), "#D7D4E0");
+    applyZoneLook(figLegs, findItemById(avatarState.picks.bottom), "#C9C6D2");
+    var shoeItem = findItemById(avatarState.picks.shoe);
+    applyZoneLook(figShoeL, shoeItem, "#2A2A30");
+    applyZoneLook(figShoeR, shoeItem, "#2A2A30");
+
+    var outerItem = findItemById(avatarState.picks.outer);
+    if(outerItem){ figOuter.hidden = false; applyZoneLook(figOuter, outerItem, "#B58A57"); }
+    else { figOuter.hidden = true; }
+
+    tryonStage.dataset.bg = avatarState.bg;
+    tryonStage.dataset.zoom = avatarState.zoom;
+    zoomClose.classList.toggle("active", avatarState.zoom==="close");
+    zoomFar.classList.toggle("active", avatarState.zoom==="far");
+    Array.prototype.forEach.call(avBuildSeg.querySelectorAll("button"), function(b){ b.classList.toggle("active", b.getAttribute("data-build")===avatarState.build); });
+    Array.prototype.forEach.call(bgSwatches.querySelectorAll("button"), function(b){ b.classList.toggle("active", b.getAttribute("data-bg")===avatarState.bg); });
+    avFaceClear.hidden = !avatarState.face;
+
+    tryonEmpty.style.display = wardrobe.length ? "none" : "block";
+  }
+
+  function renderTryonPicks(){
+    TRYON_CATS.forEach(function(c){
+      if(avatarState.picks[c.key] && !findItemById(avatarState.picks[c.key])) avatarState.picks[c.key] = null;
+    });
+    tryonPicks.innerHTML = "";
+    TRYON_CATS.forEach(function(c){
+      var row = document.createElement("label");
+      row.className = "tryon-pick-row";
+      var span = document.createElement("span"); span.textContent = c.label;
+      var sel = document.createElement("select"); sel.setAttribute("aria-label", c.label);
+      var noneOpt = document.createElement("option"); noneOpt.value=""; noneOpt.textContent="— none —";
+      sel.appendChild(noneOpt);
+      byCat(c.key).forEach(function(it){
+        var o = document.createElement("option"); o.value=String(it.id); o.textContent=it.name;
+        if(avatarState.picks[c.key]===it.id) o.selected=true;
+        sel.appendChild(o);
+      });
+      sel.addEventListener("change", function(){
+        avatarState.picks[c.key] = sel.value ? parseInt(sel.value,10) : null;
+        renderFigure(); saveAvatar();
+      });
+      row.appendChild(span); row.appendChild(sel);
+      tryonPicks.appendChild(row);
+    });
+  }
+
+  function refreshTryonAvailability(){
+    renderTryonPicks();
+    renderFigure();
+  }
+
+  avHeight.addEventListener("input", function(){
+    avatarState.height = parseInt(avHeight.value, 10);
+    avHeightVal.textContent = avatarState.height;
+    renderFigure(); saveAvatar();
+  });
+
+  Array.prototype.forEach.call(avBuildSeg.querySelectorAll("button"), function(b){
+    b.addEventListener("click", function(){
+      avatarState.build = b.getAttribute("data-build");
+      renderFigure(); saveAvatar();
+    });
+  });
+
+  Array.prototype.forEach.call(bgSwatches.querySelectorAll("button"), function(b){
+    b.addEventListener("click", function(){
+      avatarState.bg = b.getAttribute("data-bg");
+      renderFigure(); saveAvatar();
+    });
+  });
+
+  zoomClose.addEventListener("click", function(){ avatarState.zoom = "close"; renderFigure(); saveAvatar(); });
+  zoomFar.addEventListener("click", function(){ avatarState.zoom = "far"; renderFigure(); saveAvatar(); });
+
+  avFaceBtn.addEventListener("click", function(){ avFaceInput.click(); });
+  avFaceInput.addEventListener("change", function(){
+    var file = avFaceInput.files && avFaceInput.files[0];
+    avFaceInput.value = "";
+    if(!file || !/^image\//.test(file.type)) return;
+    var reader = new FileReader();
+    reader.onload = function(){
+      var img = new Image();
+      img.onload = function(){
+        var size = 200;
+        var side = Math.min(img.naturalWidth, img.naturalHeight);
+        var sx = (img.naturalWidth-side)/2, sy = (img.naturalHeight-side)/2;
+        var c = document.createElement("canvas"); c.width=size; c.height=size;
+        c.getContext("2d").drawImage(img, sx, sy, side, side, 0, 0, size, size);
+        avatarState.face = c.toDataURL("image/jpeg", 0.85);
+        renderFigure(); saveAvatar();
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+  avFaceClear.addEventListener("click", function(){
+    avatarState.face = null;
+    renderFigure(); saveAvatar();
+  });
+
+  [mHeight, mChest, mWaist, mHips].forEach(function(inp){
+    inp.addEventListener("input", function(){
+      avatarState.measurements.height = mHeight.value;
+      avatarState.measurements.chest = mChest.value;
+      avatarState.measurements.waist = mWaist.value;
+      avatarState.measurements.hips = mHips.value;
+      saveAvatar();
+    });
+  });
+
+  function initAvatar(){
+    loadAvatar();
+    avHeight.value = avatarState.height;
+    avHeightVal.textContent = avatarState.height;
+    mHeight.value = avatarState.measurements.height;
+    mChest.value = avatarState.measurements.chest;
+    mWaist.value = avatarState.measurements.waist;
+    mHips.value = avatarState.measurements.hips;
+    renderTryonPicks();
+    renderFigure();
+  }
+
   /* ===== init ===== */
   restoreWardrobe();
   renderItems(); renderRail(); updateCounts(); refreshGenAvailability();
   initWeather();
+  initAvatar();
 })();

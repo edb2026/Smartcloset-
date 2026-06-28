@@ -18,6 +18,7 @@
       <a href="#weather">Weather</a>
       <a href="#add">Add clothes</a>
       <a href="#outfits">Outfits</a>
+      <a href="#tryon">Try-on</a>
       <a href="#planning">Planning</a>
       <a href="#account">Account</a>
     </nav>
@@ -207,6 +208,93 @@
   </div>
 </section>
 
+<!-- TRY-ON / AVATAR -->
+<section class="section" id="tryon">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">See it on you</span>
+      <h2>Try it on your own silhouette.</h2>
+      <p>Build a simple figure that matches your height and build, swap in your own face, and preview outfits from your closet up close or from across the room.</p>
+    </div>
+
+    <div class="tryon-grid">
+      <div class="tryon-controls">
+        <div class="ctl-group">
+          <label class="ctl-label" for="avHeight">Height — <span id="avHeightVal">175</span> cm</label>
+          <input type="range" id="avHeight" min="150" max="200" value="175" />
+        </div>
+
+        <div class="ctl-group">
+          <span class="ctl-label">Build</span>
+          <div class="seg" id="avBuildSeg">
+            <button type="button" data-build="slim">Slim</button>
+            <button type="button" data-build="regular" class="active">Regular</button>
+            <button type="button" data-build="athletic">Athletic</button>
+            <button type="button" data-build="broad">Broad</button>
+          </div>
+        </div>
+
+        <div class="ctl-group">
+          <span class="ctl-label">Your face</span>
+          <div class="face-upload">
+            <button class="btn btn-ghost" id="avFaceBtn" type="button">Upload a photo</button>
+            <button class="btn btn-ghost" id="avFaceClear" type="button" hidden>Remove</button>
+            <input type="file" id="avFaceInput" accept="image/*" hidden />
+          </div>
+        </div>
+
+        <div class="ctl-group">
+          <span class="ctl-label">Outfit pieces</span>
+          <div class="tryon-picks" id="tryonPicks"></div>
+        </div>
+
+        <div class="ctl-group">
+          <span class="ctl-label">Background</span>
+          <div class="bg-swatches" id="bgSwatches">
+            <button type="button" data-bg="studio" class="active">Studio</button>
+            <button type="button" data-bg="work">Work</button>
+            <button type="button" data-bg="street">Street</button>
+            <button type="button" data-bg="beach">Beach</button>
+            <button type="button" data-bg="city">City</button>
+          </div>
+        </div>
+
+        <div class="ctl-group">
+          <span class="ctl-label">Your measurements (cm)</span>
+          <div class="measure-grid">
+            <label>Height<input type="number" id="mHeight" min="100" max="230" inputmode="numeric" /></label>
+            <label>Chest<input type="number" id="mChest" min="50" max="170" inputmode="numeric" /></label>
+            <label>Waist<input type="number" id="mWaist" min="40" max="170" inputmode="numeric" /></label>
+            <label>Hips<input type="number" id="mHips" min="50" max="170" inputmode="numeric" /></label>
+          </div>
+        </div>
+      </div>
+
+      <div class="tryon-stage" id="tryonStage">
+        <div class="zoom-toggle" role="group" aria-label="Zoom">
+          <button type="button" id="zoomClose" data-zoom="close">Close-up</button>
+          <button type="button" id="zoomFar" class="active" data-zoom="far">Full view</button>
+        </div>
+        <div class="figure-wrap" id="figureWrap">
+          <div class="figure" id="figure">
+            <div class="fig-head" id="figHead"></div>
+            <div class="fig-torso-wrap">
+              <div class="fig-torso" id="figTorso"></div>
+              <div class="fig-outer" id="figOuter" hidden></div>
+            </div>
+            <div class="fig-legs" id="figLegs"></div>
+            <div class="fig-shoes">
+              <div class="fig-shoe" id="figShoeL"></div>
+              <div class="fig-shoe" id="figShoeR"></div>
+            </div>
+          </div>
+        </div>
+        <p class="tryon-empty" id="tryonEmpty">Add a few clothes first, then pick pieces to try on.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- PLANNING -->
 <section class="section" id="planning">
   <div class="wrap">
@@ -335,7 +423,7 @@
         <p style="color:var(--ink-soft);font-size:14.5px">The intelligent closet that helps you wear everything you already own.</p>
       </div>
       <div class="col"><h5>Product</h5><a href="#add">Add clothes</a><a href="#outfits">Outfit generator</a><a href="#planning">Planning</a><a href="#account">Account</a></div>
-      <div class="col"><h5>Wardrobe</h5><a href="#match">Build around a piece</a><a href="#outfits">Occasions</a><a href="#planning">Wear history</a></div>
+      <div class="col"><h5>Wardrobe</h5><a href="#match">Build around a piece</a><a href="#tryon">Try it on</a><a href="#outfits">Occasions</a><a href="#planning">Wear history</a></div>
       <div class="col"><h5>Company</h5><a href="#">About</a><a href="#">Privacy</a><a href="#">Terms</a><a href="#">Support</a></div>
     </div>
     <div class="foot-bottom">
