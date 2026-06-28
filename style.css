@@ -51,8 +51,9 @@ button{font-family:inherit;}
 
 .fig-head{width:26%;aspect-ratio:1/1;top:1.5%;left:50%;transform:translateX(-50%);border-radius:50%;z-index:4;overflow:visible;}
 .figure-stage[data-gender="male"] .fig-head{width:23%;top:0.5%;}
-.head-photo{position:absolute;inset:0;border-radius:50%;overflow:hidden;background:transparent;}
-.head-photo img{width:100%;height:100%;object-fit:cover;}
+.head-photo{position:absolute;inset:0;overflow:visible;background:transparent;}
+.head-photo.empty{border-radius:50%;}
+.head-photo img{width:100%;height:100%;object-fit:contain;}
 .head-photo.empty::before,.head-photo.empty::after{content:none;}
 .head-add{position:absolute;right:-6%;bottom:-6%;width:32%;height:32%;min-width:26px;min-height:26px;border-radius:50%;background:var(--iris);color:#fff;border:3px solid var(--paper);display:grid;place-items:center;cursor:pointer;z-index:5;transition:.15s;}
 .head-add:hover{background:var(--iris-deep);}
