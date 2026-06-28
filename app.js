@@ -161,15 +161,15 @@
       const seen = new Uint8Array(w * h);
       const stack = new Int32Array(w * h);
       let largest = 0;
+      let largestRegion = null;
       for (let start = 0; start < w * h; start++) {
         if (seen[start] || d[start * 4 + 3] <= 200) { seen[start] = 1; continue; }
         let sp = 0;
         stack[sp++] = start;
         seen[start] = 1;
-        let count = 0;
+        const region = [start];
         while (sp > 0) {
           const idx = stack[--sp];
-          count++;
           const x = idx % w, y = (idx - x) / w;
           const nbrs = [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]];
           for (const [nx, ny] of nbrs) {
@@ -178,9 +178,10 @@
             if (seen[nIdx] || d[nIdx * 4 + 3] <= 200) { seen[nIdx] = 1; continue; }
             seen[nIdx] = 1;
             stack[sp++] = nIdx;
+            region.push(nIdx);
           }
         }
-        if (count > largest) largest = count;
+        if (region.length > largest) { largest = region.length; largestRegion = region; }
       }
 
       // Bounding-box fill ratio of the surviving opaque pixels - how
@@ -202,7 +203,7 @@
       const bboxArea = maxX >= minX ? (maxX - minX + 1) * (maxY - minY + 1) : 0;
       const fillRatio = bboxArea > 0 ? opaqueCount / bboxArea : 0;
 
-      return { imgData, blobFrac: largest / (w * h), totalOpaqueFrac: opaqueCount / (w * h), fillRatio };
+      return { imgData, blobFrac: largest / (w * h), totalOpaqueFrac: opaqueCount / (w * h), fillRatio, largestRegion };
     }
 
     // Head photos can't legitimately have a large interior gap the way a
@@ -223,7 +224,23 @@
         if (a.totalOpaqueFrac > cap) continue;
         if (!best || a.fillRatio > best.fillRatio) best = a;
       }
-      return (best || attempts[0]).imgData;
+      const chosen = best || attempts[0];
+
+      // A head is anatomically one connected piece (hair, skin and neck are
+      // all physically attached) - unlike a garment, which can legitimately
+      // have separate parts (a strap, a second sleeve), so it's safe to drop
+      // anything outside the largest connected region. Without this, a
+      // small stray bit of survived background (a reflection, a dark object
+      // a few pixels across - too big for despeckle's size floor, but not
+      // part of the face) silently inflates the crop's bounding box, which
+      // shrinks and mis-centers the real face inside the fixed head slot.
+      const cd = chosen.imgData.data;
+      const keep = new Uint8Array(w * h);
+      for (const idx of chosen.largestRegion) keep[idx] = 1;
+      for (let idx = 0; idx < w * h; idx++) {
+        if (!keep[idx] && cd[idx * 4 + 3] > 0) cd[idx * 4 + 3] = 0;
+      }
+      return chosen.imgData;
     }
 
     let result = attempt(threshold);
