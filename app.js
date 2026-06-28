@@ -80,7 +80,7 @@
   // against. So the check instead looks at the size of the largest
   // connected opaque region: a real garment survives as one big blob, while
   // an over-aggressive cut leaves only small disconnected fragments.
-  function removeBackground(ctx, w, h, threshold = 38) {
+  function removeBackground(ctx, w, h, threshold = 38, mode = 'garment') {
     const original = ctx.getImageData(0, 0, w, h);
     const od = original.data;
 
@@ -183,7 +183,47 @@
         if (count > largest) largest = count;
       }
 
-      return { imgData, blobFrac: largest / (w * h) };
+      // Bounding-box fill ratio of the surviving opaque pixels - how
+      // "solid" the result is within its own outline, vs. hollowed out by
+      // a leaky flood fill. Only consulted in head mode (see below); unused
+      // here, so it can't change garment-mode output.
+      let opaqueCount = 0;
+      let minX = w, minY = h, maxX = -1, maxY = -1;
+      for (let idx = 0; idx < w * h; idx++) {
+        if (d[idx * 4 + 3] > 200) {
+          opaqueCount++;
+          const x = idx % w, y = (idx - x) / w;
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+        }
+      }
+      const bboxArea = maxX >= minX ? (maxX - minX + 1) * (maxY - minY + 1) : 0;
+      const fillRatio = bboxArea > 0 ? opaqueCount / bboxArea : 0;
+
+      return { imgData, blobFrac: largest / (w * h), totalOpaqueFrac: opaqueCount / (w * h), fillRatio };
+    }
+
+    // Head photos can't legitimately have a large interior gap the way a
+    // garment can (an open jacket, a sleeve/armpit gap), so for heads it's
+    // safe to pick whichever threshold leaves the most "solid" silhouette
+    // instead of stopping at the first one with a big enough blob. That
+    // matters because a single high-contrast feature (e.g. dark hair) can
+    // satisfy the blob-size bar on its own while a separate, lower-contrast
+    // part of the same subject (skin near the background color) is erased
+    // out from under it - the garment logic below would stop right there
+    // and ship the hollowed-out result.
+    if (mode === 'head') {
+      const attempts = [attempt(threshold)];
+      for (const mul of [0.65, 0.45, 0.3, 0.2, 0.13]) attempts.push(attempt(threshold * mul));
+      const cap = 0.55; // guards against the same background-gradient leakage risk that rules out chasing fillRatio for garments
+      let best = null;
+      for (const a of attempts) {
+        if (a.totalOpaqueFrac > cap) continue;
+        if (!best || a.fillRatio > best.fillRatio) best = a;
+      }
+      return (best || attempts[0]).imgData;
     }
 
     let result = attempt(threshold);
@@ -209,6 +249,60 @@
     }
     if (maxX < minX) return null;
     return { minX, minY, maxX, maxY };
+  }
+
+  // Fills small holes punched into the garment by the flood fill. A thin,
+  // almost-invisible trail of background-colored pixels - fabric grain,
+  // compression noise, a fold - can connect the border all the way to a
+  // speck deep inside the garment, leaving "salt" noise scattered across an
+  // otherwise intact cutout. Because that noise is reached via a real path
+  // from the border, it's topologically one connected region with the rest
+  // of the removed background - despeckle's component counting can't catch
+  // it, since it only sees one giant component. Closing (dilate, then
+  // erode) instead looks at local geometry: any transparent gap small
+  // enough to be fully surrounded by opaque pixels gets reclaimed and its
+  // original color restored, while the real surrounding background (much
+  // larger than the kernel) is left alone.
+  function closeHoles(imgData, original, w, h, radius = 3) {
+    const d = imgData.data;
+    const od = original.data;
+    const n = w * h;
+    const mask = new Uint8Array(n);
+    for (let i = 0; i < n; i++) mask[i] = d[i * 4 + 3] > 10 ? 1 : 0;
+
+    function grow(src, dilate) {
+      const out = new Uint8Array(n);
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          let v = dilate ? 0 : 1;
+          outer:
+          for (let dy = -radius; dy <= radius; dy++) {
+            const ny = y + dy;
+            for (let dx = -radius; dx <= radius; dx++) {
+              const nx = x + dx;
+              const inBounds = nx >= 0 && ny >= 0 && nx < w && ny < h;
+              const s = inBounds ? src[ny * w + nx] : 0;
+              if (dilate) {
+                if (s) { v = 1; break outer; }
+              } else if (!s) {
+                v = 0; break outer;
+              }
+            }
+          }
+          out[y * w + x] = v;
+        }
+      }
+      return out;
+    }
+
+    const closed = grow(grow(mask, true), false);
+    for (let i = 0; i < n; i++) {
+      if (closed[i] && !mask[i]) {
+        const j = i * 4;
+        d[j] = od[j]; d[j + 1] = od[j + 1]; d[j + 2] = od[j + 2]; d[j + 3] = 255;
+      }
+    }
+    return imgData;
   }
 
   // Removes small disconnected speckles left over from background removal
@@ -301,7 +395,9 @@
 
     onStatus && onStatus('Removing background…');
     await tick();
+    const original = ctx.getImageData(0, 0, w, h);
     let imgData = removeBackground(ctx, w, h);
+    closeHoles(imgData, original, w, h);
     despeckle(imgData, w, h);
     featherAlpha(imgData, w, h);
     ctx.putImageData(imgData, 0, 0);
@@ -343,7 +439,9 @@
 
     onStatus && onStatus('Removing background…');
     await tick();
-    const imgData = removeBackground(ctx, w, h);
+    const original = ctx.getImageData(0, 0, w, h);
+    const imgData = removeBackground(ctx, w, h, 38, 'head');
+    closeHoles(imgData, original, w, h);
     despeckle(imgData, w, h);
     featherAlpha(imgData, w, h);
     ctx.putImageData(imgData, 0, 0);
