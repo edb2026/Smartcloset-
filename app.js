@@ -56,9 +56,12 @@
     return Math.sqrt((r1 - r2) ** 2 + (g1 - g2) ** 2 + (b1 - b2) ** 2);
   }
 
-  // Chroma-key style background removal: flood fill from the border,
-  // removing pixels close in color to the sampled corner background.
-  function removeBackground(ctx, w, h, threshold = 40) {
+  // Background removal: flood fill from the border, treating a pixel as
+  // background if it matches one of several color clusters sampled along
+  // the border (handles scenes with more than one background region, e.g.
+  // a closet wall plus shelving) OR is close to the neighbor that reached
+  // it (handles smooth gradients/shadows within a single region).
+  function removeBackground(ctx, w, h, threshold = 38) {
     const imgData = ctx.getImageData(0, 0, w, h);
     const d = imgData.data;
 
@@ -66,25 +69,56 @@
     for (let i = 3; i < d.length; i += 4) if (d[i] < 200) transparentCount++;
     if (transparentCount / (w * h) > 0.04) return imgData; // already cut out
 
-    const corners = [[0, 0], [w - 1, 0], [0, h - 1], [w - 1, h - 1]];
-    let cr = 0, cg = 0, cb = 0;
-    corners.forEach(([x, y]) => {
-      const i = (y * w + x) * 4;
-      cr += d[i]; cg += d[i + 1]; cb += d[i + 2];
-    });
-    cr /= 4; cg /= 4; cb /= 4;
+    const clusters = [];
+    const mergeDist = 30;
+    function addSample(r, g, b) {
+      for (const c of clusters) {
+        if (colorDist(r, g, b, c.r, c.g, c.b) <= mergeDist) {
+          c.r = (c.r * c.n + r) / (c.n + 1);
+          c.g = (c.g * c.n + g) / (c.n + 1);
+          c.b = (c.b * c.n + b) / (c.n + 1);
+          c.n++;
+          return;
+        }
+      }
+      if (clusters.length < 16) clusters.push({ r, g, b, n: 1 });
+    }
+    for (let x = 0; x < w; x++) {
+      let i = x * 4; addSample(d[i], d[i + 1], d[i + 2]);
+      i = ((h - 1) * w + x) * 4; addSample(d[i], d[i + 1], d[i + 2]);
+    }
+    for (let y = 0; y < h; y++) {
+      let i = (y * w) * 4; addSample(d[i], d[i + 1], d[i + 2]);
+      i = (y * w + w - 1) * 4; addSample(d[i], d[i + 1], d[i + 2]);
+    }
+    function matchesBackground(r, g, b) {
+      for (const c of clusters) if (colorDist(r, g, b, c.r, c.g, c.b) <= threshold) return true;
+      return false;
+    }
 
     const visited = new Uint8Array(w * h);
     const queue = new Int32Array(w * h);
     let qh = 0, qt = 0;
 
-    function tryPush(x, y) {
+    function seed(x, y) {
+      const idx = y * w + x;
+      if (visited[idx]) return;
+      visited[idx] = 1;
+      d[idx * 4 + 3] = 0;
+      queue[qt++] = idx;
+    }
+    // The whole border is assumed to be background (the item shouldn't touch the frame edge).
+    for (let x = 0; x < w; x++) { seed(x, 0); seed(x, h - 1); }
+    for (let y = 0; y < h; y++) { seed(0, y); seed(w - 1, y); }
+
+    const neighborThreshold = threshold * 0.72;
+    function tryPush(x, y, pr, pg, pb) {
       if (x < 0 || y < 0 || x >= w || y >= h) return;
       const idx = y * w + x;
       if (visited[idx]) return;
       const i = idx * 4;
-      const dist = colorDist(d[i], d[i + 1], d[i + 2], cr, cg, cb);
-      if (dist <= threshold) {
+      const r = d[i], g = d[i + 1], b = d[i + 2];
+      if (matchesBackground(r, g, b) || colorDist(r, g, b, pr, pg, pb) <= neighborThreshold) {
         visited[idx] = 1;
         d[i + 3] = 0;
         queue[qt++] = idx;
@@ -93,12 +127,13 @@
       }
     }
 
-    for (let x = 0; x < w; x++) { tryPush(x, 0); tryPush(x, h - 1); }
-    for (let y = 0; y < h; y++) { tryPush(0, y); tryPush(w - 1, y); }
     while (qh < qt) {
       const idx = queue[qh++];
       const x = idx % w, y = (idx - x) / w;
-      tryPush(x - 1, y); tryPush(x + 1, y); tryPush(x, y - 1); tryPush(x, y + 1);
+      const i = idx * 4;
+      const pr = d[i], pg = d[i + 1], pb = d[i + 2];
+      tryPush(x - 1, y, pr, pg, pb); tryPush(x + 1, y, pr, pg, pb);
+      tryPush(x, y - 1, pr, pg, pb); tryPush(x, y + 1, pr, pg, pb);
     }
     return imgData;
   }
@@ -233,6 +268,45 @@
     await tick(220);
 
     return { src: finalCanvas.toDataURL('image/png'), w: finalCanvas.width, h: finalCanvas.height };
+  }
+
+  // Cuts the face photo out by its contour (background removed, cropped tight)
+  // instead of a plain circular crop, so it follows the head/hair outline.
+  async function processHeadPhoto(file, onStatus) {
+    const dataUrl = await fileToDataURL(file);
+    const img = await loadImage(dataUrl);
+
+    const MAX_DIM = 640;
+    const scale = Math.min(1, MAX_DIM / Math.max(img.width, img.height));
+    const w = Math.round(img.width * scale), h = Math.round(img.height * scale);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0, w, h);
+
+    onStatus && onStatus('Removing background…');
+    await tick();
+    const imgData = removeBackground(ctx, w, h);
+    ctx.putImageData(imgData, 0, 0);
+
+    onStatus && onStatus('Cropping to outline…');
+    await tick();
+    const box = bbox(imgData, w, h) || { minX: 0, minY: 0, maxX: w - 1, maxY: h - 1 };
+
+    const pad = 4;
+    const cx0 = Math.max(0, box.minX - pad), cy0 = Math.max(0, box.minY - pad);
+    const cw = Math.min(w, box.maxX + pad) - cx0;
+    const ch = Math.min(h, box.maxY + pad) - cy0;
+    const finalCanvas = document.createElement('canvas');
+    finalCanvas.width = Math.max(1, cw);
+    finalCanvas.height = Math.max(1, ch);
+    finalCanvas.getContext('2d').drawImage(canvas, cx0, cy0, cw, ch, 0, 0, cw, ch);
+
+    onStatus && onStatus('Done!');
+    await tick(220);
+
+    return finalCanvas.toDataURL('image/png');
   }
 
   // ===================================================================
@@ -519,10 +593,18 @@
       const file = e.target.files[0];
       e.target.value = '';
       if (!file) return;
-      state.headPhoto = await fileToDataURL(file);
-      renderFigure();
-      popAnimate($('#figHead'));
-      save();
+      showAiOverlay();
+      try {
+        state.headPhoto = await processHeadPhoto(file, setAiStatus);
+        renderFigure();
+        popAnimate($('#figHead'));
+        save();
+      } catch (err) {
+        console.error(err);
+        alert('Could not process the photo. Try a different image.');
+      } finally {
+        hideAiOverlay();
+      }
     });
 
     $$('#bgPicker button').forEach((b) => {
