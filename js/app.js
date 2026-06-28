@@ -46,8 +46,128 @@
   var clearBtn  = document.getElementById("clearBtn");
   var rail      = document.getElementById("rail");
 
-  /* ===== downscale to a storable data URL + sample its average color ===== */
-  function resizeAndColor(img, cb){
+  /* ===== background removal + garment-focused color extraction ===== */
+  function colorDist(r1,g1,b1,r2,g2,b2){
+    var dr=r1-r2, dg=g1-g2, db=b1-b2;
+    return Math.sqrt(dr*dr+dg*dg+db*db);
+  }
+
+  // Heuristic chroma-key cutout: flood-fills the background starting from the
+  // image border (typical garment photos have a roughly uniform backdrop) and
+  // keeps everything else opaque. Returns null when the photo doesn't look
+  // like a clean foreground/background split, so the caller can fall back.
+  function removeBackground(srcCanvas){
+    var w = srcCanvas.width, h = srcCanvas.height;
+    var imgData = srcCanvas.getContext("2d").getImageData(0, 0, w, h);
+    var data = imgData.data;
+    var tolerance = 32;
+    function idx(x,y){ return (y*w+x)*4; }
+
+    var borderPts = [];
+    var step = Math.max(1, Math.round(Math.min(w,h)/40));
+    for(var x=0; x<w; x+=step){ borderPts.push(x,0,x,h-1); }
+    for(var y=0; y<h; y+=step){ borderPts.push(0,y,w-1,y); }
+
+    var br=0,bg=0,bb=0,bn=0;
+    for(var p=0;p<borderPts.length;p+=2){
+      var bi0 = idx(borderPts[p], borderPts[p+1]);
+      br+=data[bi0]; bg+=data[bi0+1]; bb+=data[bi0+2]; bn++;
+    }
+    br/=bn; bg/=bn; bb/=bn;
+
+    var visited = new Uint8Array(w*h);
+    var bgMask  = new Uint8Array(w*h);
+    var queue = [];
+    for(var p2=0;p2<borderPts.length;p2+=2){
+      var bx=borderPts[p2], by=borderPts[p2+1];
+      var pos0 = by*w+bx;
+      if(visited[pos0]) continue;
+      visited[pos0] = 1;
+      var di0 = idx(bx,by);
+      if(colorDist(data[di0],data[di0+1],data[di0+2], br,bg,bb) <= tolerance){
+        bgMask[pos0] = 1; queue.push(pos0);
+      }
+    }
+
+    var dxs=[-1,1,0,0], dys=[0,0,-1,1], qi = 0;
+    while(qi < queue.length){
+      var pos = queue[qi++];
+      var px = pos % w, py = (pos - px) / w;
+      for(var n=0;n<4;n++){
+        var nx=px+dxs[n], ny=py+dys[n];
+        if(nx<0||ny<0||nx>=w||ny>=h) continue;
+        var ni = ny*w+nx;
+        if(visited[ni]) continue;
+        visited[ni] = 1;
+        var ndi = idx(nx,ny);
+        if(colorDist(data[ndi],data[ndi+1],data[ndi+2], br,bg,bb) <= tolerance){
+          bgMask[ni] = 1; queue.push(ni);
+        }
+      }
+    }
+
+    var fgCount = 0;
+    for(var k=0;k<w*h;k++){ if(!bgMask[k]) fgCount++; }
+    var coverage = fgCount / (w*h);
+    if(coverage < 0.02 || coverage > 0.98) return null; // no clean foreground/background split
+
+    var rawAlpha = new Uint8ClampedArray(w*h);
+    for(var m=0;m<w*h;m++){ rawAlpha[m] = bgMask[m] ? 0 : 255; }
+
+    var minX=w, minY=h, maxX=0, maxY=0;
+    for(var yy=0; yy<h; yy++){
+      for(var xx=0; xx<w; xx++){
+        var sum=0, cnt=0;
+        for(var oy=-1;oy<=1;oy++){
+          for(var ox=-1;ox<=1;ox++){
+            var sx=xx+ox, sy=yy+oy;
+            if(sx<0||sy<0||sx>=w||sy>=h) continue;
+            sum += rawAlpha[sy*w+sx]; cnt++;
+          }
+        }
+        var a = Math.round(sum/cnt);
+        data[idx(xx,yy)+3] = a;
+        if(a>8){ if(xx<minX)minX=xx; if(xx>maxX)maxX=xx; if(yy<minY)minY=yy; if(yy>maxY)maxY=yy; }
+      }
+    }
+    if(maxX<minX || maxY<minY) return null;
+
+    // write the alpha-adjusted pixels to a fresh canvas so the original
+    // (opaque) source canvas stays usable for a JPEG fallback if needed
+    var tmp = document.createElement("canvas"); tmp.width=w; tmp.height=h;
+    tmp.getContext("2d").putImageData(imgData, 0, 0);
+
+    var pad = 6;
+    var cropX = Math.max(0, minX-pad), cropY = Math.max(0, minY-pad);
+    var cropW = Math.min(w, maxX+pad+1) - cropX;
+    var cropH = Math.min(h, maxY+pad+1) - cropY;
+
+    var out = document.createElement("canvas"); out.width=cropW; out.height=cropH;
+    out.getContext("2d").drawImage(tmp, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+
+    var sample = out.getContext("2d").getImageData(0, 0, cropW, cropH).data;
+    var r=0,g=0,b=0,n=0;
+    for(var s=0; s<sample.length; s+=4){
+      if(sample[s+3] > 80){ r+=sample[s]; g+=sample[s+1]; b+=sample[s+2]; n++; }
+    }
+    if(!n) return null;
+
+    return {
+      dataUrl: out.toDataURL("image/png"),
+      color: "rgb("+Math.round(r/n)+","+Math.round(g/n)+","+Math.round(b/n)+")"
+    };
+  }
+
+  function avgColorFallback(canvas){
+    var sw=12, sh=12, sc=document.createElement("canvas"); sc.width=sw; sc.height=sh;
+    sc.getContext("2d").drawImage(canvas, 0, 0, sw, sh);
+    var d = sc.getContext("2d").getImageData(0,0,sw,sh).data, r=0,g=0,b=0,n=0;
+    for(var i=0;i<d.length;i+=4){ r+=d[i]; g+=d[i+1]; b+=d[i+2]; n++; }
+    return "rgb("+Math.round(r/n)+","+Math.round(g/n)+","+Math.round(b/n)+")";
+  }
+
+  /* ===== downscale, attempt a background cutout, fall back to a flat photo ===== */
+  function processGarmentImage(img, cb){
     try{
       var maxDim = 640;
       var scale = Math.min(1, maxDim / Math.max(img.naturalWidth, img.naturalHeight));
@@ -55,14 +175,12 @@
       var h = Math.max(1, Math.round(img.naturalHeight * scale));
       var c = document.createElement("canvas"); c.width = w; c.height = h;
       c.getContext("2d").drawImage(img, 0, 0, w, h);
-      var dataUrl = c.toDataURL("image/jpeg", 0.85);
 
-      var sw = 12, sh = 12, sc = document.createElement("canvas"); sc.width = sw; sc.height = sh;
-      sc.getContext("2d").drawImage(c, 0, 0, sw, sh);
-      var d = sc.getContext("2d").getImageData(0, 0, sw, sh).data, r=0,g=0,b=0,n=0;
-      for(var i=0;i<d.length;i+=4){ r+=d[i]; g+=d[i+1]; b+=d[i+2]; n++; }
-      cb(dataUrl, "rgb("+Math.round(r/n)+","+Math.round(g/n)+","+Math.round(b/n)+")");
-    }catch(e){ cb(null, "#C9C6D2"); }
+      var cutout = removeBackground(c);
+      if(cutout){ cb(cutout.dataUrl, cutout.color, true); return; }
+
+      cb(c.toDataURL("image/jpeg", 0.85), avgColorFallback(c), false);
+    }catch(e){ cb(null, "#C9C6D2", false); }
   }
 
   /* ===== add uploaded files ===== */
@@ -73,14 +191,14 @@
       reader.onload = function(){
         var img = new Image();
         img.onload = function(){
-          resizeAndColor(img, function(dataUrl, color){
-            var item = { id: nextId++, url: dataUrl, color: color, category: "top", name: "Wardrobe piece", silhouette: "g-top" };
+          processGarmentImage(img, function(dataUrl, color, cutout){
+            var item = { id: nextId++, url: dataUrl, color: color, category: "top", name: "Wardrobe piece", silhouette: "g-top", cutout: !!cutout };
             wardrobe.push(item);
             renderItems(); renderRail(); updateCounts(); refreshGenAvailability(); persistWardrobe();
           });
         };
         img.onerror = function(){
-          var item = {id:nextId++, url:null, color:"#C9C6D2", category:"top", name:"Wardrobe piece", silhouette:"g-top"};
+          var item = {id:nextId++, url:null, color:"#C9C6D2", category:"top", name:"Wardrobe piece", silhouette:"g-top", cutout:false};
           wardrobe.push(item); renderItems(); renderRail(); updateCounts(); refreshGenAvailability(); persistWardrobe();
         };
         img.src = reader.result;
@@ -119,8 +237,16 @@
       card.className = "item";
       var ph = document.createElement("div");
       ph.className = "ph";
-      if(it.url){ ph.style.backgroundImage = "url('"+it.url+"')"; }
-      else { ph.style.background = it.color; }
+      if(it.url){
+        var phImg = document.createElement("div");
+        phImg.className = "ph-img";
+        phImg.style.backgroundImage = "url('"+it.url+"')";
+        phImg.style.backgroundSize = it.cutout ? "contain" : "cover";
+        if(it.cutout) ph.classList.add("cutout-bg");
+        ph.appendChild(phImg);
+      } else {
+        ph.style.background = it.color;
+      }
       var rm = document.createElement("button");
       rm.className = "rm"; rm.type="button"; rm.setAttribute("aria-label","Remove item"); rm.textContent="×";
       rm.addEventListener("click", function(){

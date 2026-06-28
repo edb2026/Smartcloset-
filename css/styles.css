@@ -94,6 +94,8 @@
   .grid-items{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:14px;}
   .item{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;animation:rise .3s ease both;}
   .item .ph{aspect-ratio:1;background:var(--paper-2) center/cover no-repeat;position:relative;}
+  .item .ph.cutout-bg{background:repeating-conic-gradient(#e8e6ef 0% 25%, #f6f5f9 0% 50%) 0 0/16px 16px;}
+  .ph-img{position:absolute;inset:0;background-position:center;background-repeat:no-repeat;}
   .item .rm{position:absolute;top:7px;right:7px;width:24px;height:24px;border-radius:50%;border:0;background:rgba(26,25,34,.66);color:#fff;font-size:14px;line-height:1;cursor:pointer;display:grid;place-items:center;}
   .item .rm:hover{background:#C0392B;}
   .item .meta{padding:9px 9px 11px;}
