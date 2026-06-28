@@ -177,14 +177,14 @@
     let ctx = canvas.getContext('2d');
     ctx.drawImage(img, 0, 0, w, h);
 
-    onStatus && onStatus('Удаляю фон…');
+    onStatus && onStatus('Removing background…');
     await tick();
     let imgData = removeBackground(ctx, w, h);
     ctx.putImageData(imgData, 0, 0);
 
     let box = bbox(imgData, w, h) || { minX: 0, minY: 0, maxX: w - 1, maxY: h - 1 };
 
-    onStatus && onStatus('Выравниваю вещь, как поглаженную…');
+    onStatus && onStatus('Straightening item…');
     await tick();
 
     if (category === 'top' || category === 'bottom' || category === 'shoes') {
@@ -217,7 +217,7 @@
       }
     }
 
-    onStatus && onStatus('Обрезаю по контуру…');
+    onStatus && onStatus('Cropping to outline…');
     await tick();
 
     const pad = 6;
@@ -229,7 +229,7 @@
     finalCanvas.height = Math.max(1, ch);
     finalCanvas.getContext('2d').drawImage(canvas, cx0, cy0, cw, ch, 0, 0, cw, ch);
 
-    onStatus && onStatus('Готово!');
+    onStatus && onStatus('Done!');
     await tick(220);
 
     return { src: finalCanvas.toDataURL('image/png'), w: finalCanvas.width, h: finalCanvas.height };
@@ -257,16 +257,16 @@
 
   function seedDemoWardrobe() {
     const demo = [
-      { category: 'top', name: 'Демо: футболка', svg: DEMO_SVG.tshirt },
-      { category: 'top', name: 'Демо: рубашка', svg: DEMO_SVG.shirt },
-      { category: 'bottom', name: 'Демо: джинсы', svg: DEMO_SVG.jeans },
-      { category: 'bottom', name: 'Демо: шорты', svg: DEMO_SVG.shorts },
-      { category: 'shoes', name: 'Демо: кроссовки', svg: DEMO_SVG.sneaker },
-      { category: 'shoes', name: 'Демо: сандалии', svg: DEMO_SVG.sandal },
-      { category: 'accessories', subtype: 'bag', name: 'Демо: сумка', svg: DEMO_SVG.bag },
-      { category: 'accessories', subtype: 'glasses', name: 'Демо: очки', svg: DEMO_SVG.glasses },
-      { category: 'accessories', subtype: 'hat', name: 'Демо: шляпа', svg: DEMO_SVG.hat },
-      { category: 'accessories', subtype: 'watch', name: 'Демо: часы', svg: DEMO_SVG.watch },
+      { category: 'top', name: 'Demo: T-shirt', svg: DEMO_SVG.tshirt },
+      { category: 'top', name: 'Demo: Shirt', svg: DEMO_SVG.shirt },
+      { category: 'bottom', name: 'Demo: Jeans', svg: DEMO_SVG.jeans },
+      { category: 'bottom', name: 'Demo: Shorts', svg: DEMO_SVG.shorts },
+      { category: 'shoes', name: 'Demo: Sneakers', svg: DEMO_SVG.sneaker },
+      { category: 'shoes', name: 'Demo: Sandals', svg: DEMO_SVG.sandal },
+      { category: 'accessories', subtype: 'bag', name: 'Demo: Bag', svg: DEMO_SVG.bag },
+      { category: 'accessories', subtype: 'glasses', name: 'Demo: Glasses', svg: DEMO_SVG.glasses },
+      { category: 'accessories', subtype: 'hat', name: 'Demo: Hat', svg: DEMO_SVG.hat },
+      { category: 'accessories', subtype: 'watch', name: 'Demo: Watch', svg: DEMO_SVG.watch },
     ];
     state.wardrobe = demo.map((d) => ({
       id: uid(),
@@ -310,7 +310,7 @@
 
     const headPhotoEl = $('#headPhoto');
     if (state.headPhoto) {
-      headPhotoEl.innerHTML = `<img src="${state.headPhoto}" alt="Фото лица">`;
+      headPhotoEl.innerHTML = `<img src="${state.headPhoto}" alt="Face photo">`;
       headPhotoEl.classList.remove('empty');
     } else {
       headPhotoEl.innerHTML = '';
@@ -338,7 +338,7 @@
   }
 
   function categoryLabel(cat) {
-    return { top: 'верх', bottom: 'низ', shoes: 'обувь', accessories: 'аксессуар' }[cat] || cat;
+    return { top: 'top', bottom: 'bottom', shoes: 'shoes', accessories: 'accessory' }[cat] || cat;
   }
 
   function renderWardrobeGrid() {
@@ -365,17 +365,14 @@
   }
 
   function pluralize(n) {
-    const mod10 = n % 10, mod100 = n % 100;
-    if (mod10 === 1 && mod100 !== 11) return 'вещь';
-    if ([2, 3, 4].includes(mod10) && ![12, 13, 14].includes(mod100)) return 'вещи';
-    return 'вещей';
+    return n === 1 ? 'item' : 'items';
   }
 
   function buildAddCard() {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'wp-card wp-add';
-    btn.innerHTML = `<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span>Добавить фото</span>`;
+    btn.innerHTML = `<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span>Add photo</span>`;
     btn.addEventListener('click', () => $('#itemFileInput').click());
     return btn;
   }
@@ -390,7 +387,7 @@
     const thumb = document.createElement('button');
     thumb.type = 'button';
     thumb.className = 'wp-thumb';
-    thumb.setAttribute('aria-label', `${isEquipped ? 'Снять' : 'Надеть'}: ${item.name}`);
+    thumb.setAttribute('aria-label', `${isEquipped ? 'Remove' : 'Wear'}: ${item.name}`);
     thumb.innerHTML = `<img src="${item.src}" alt="${item.name}">` + (isEquipped ? '<span class="wp-check">✓</span>' : '');
     thumb.addEventListener('click', () => equipItem(item));
 
@@ -401,7 +398,7 @@
     const del = document.createElement('button');
     del.type = 'button';
     del.className = 'wp-del';
-    del.setAttribute('aria-label', 'Удалить вещь');
+    del.setAttribute('aria-label', 'Remove item');
     del.textContent = '×';
     del.addEventListener('click', (e) => { e.stopPropagation(); removeItem(item.id); });
 
@@ -463,7 +460,7 @@
       save();
     } catch (err) {
       console.error(err);
-      alert('Не удалось обработать фото. Попробуйте другое изображение.');
+      alert('Could not process the photo. Try a different image.');
     } finally {
       hideAiOverlay();
     }
@@ -471,10 +468,10 @@
 
   function defaultName(category, subtype) {
     const names = {
-      top: 'Верх', bottom: 'Низ', shoes: 'Обувь',
-      bag: 'Сумка', glasses: 'Очки', hat: 'Шляпа', watch: 'Часы',
+      top: 'Top', bottom: 'Bottom', shoes: 'Shoes',
+      bag: 'Bag', glasses: 'Glasses', hat: 'Hat', watch: 'Watch',
     };
-    return names[subtype || category] || 'Вещь';
+    return names[subtype || category] || 'Item';
   }
 
   function showAiOverlay() { $('#aiOverlay').hidden = false; }
